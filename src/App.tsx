@@ -38,6 +38,8 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [transactionToDelete, setTransactionToDelete] = useState<number | null>(null);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -47,7 +49,7 @@ export default function App() {
     description: '',
     amount: 0,
     type: 'expense',
-    category: 'Alimentação',
+    category: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     isRecurring: false,
     installments: 1,
@@ -83,11 +85,28 @@ export default function App() {
   const fetchCategories = async () => {
     try {
       const res = await fetch('/api/categories');
+      if (!res.ok) throw new Error('API offline');
       const data = await res.json();
       setCategories(data);
       return data;
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('Error fetching categories, using fallbacks:', error);
+      const fallbacks: Category[] = [
+        { id: -1, name: 'Salário', type: 'income' },
+        { id: -2, name: 'Investimentos', type: 'income' },
+        { id: -3, name: 'Presente', type: 'income' },
+        { id: -4, name: 'Outros', type: 'income' },
+        { id: -5, name: 'Alimentação', type: 'expense' },
+        { id: -6, name: 'Moradia', type: 'expense' },
+        { id: -7, name: 'Transporte', type: 'expense' },
+        { id: -8, name: 'Lazer', type: 'expense' },
+        { id: -9, name: 'Saúde', type: 'expense' },
+        { id: -10, name: 'Educação', type: 'expense' },
+        { id: -11, name: 'Compras', type: 'expense' },
+        { id: -12, name: 'Outros', type: 'expense' },
+      ];
+      setCategories(fallbacks);
+      return fallbacks;
     }
   };
 
@@ -116,15 +135,18 @@ export default function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Instant close for better UX
+    setIsModalOpen(false);
+    
     try {
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
+      
       if (res.ok) {
         fetchTransactions();
-        setIsModalOpen(false);
         const firstExpense = categories.find(c => c.type === 'expense')?.name || 'Outros';
         setFormData({
           description: '',
@@ -135,23 +157,46 @@ export default function App() {
           isRecurring: false,
           installments: 1,
         });
+      } else {
+        alert('Erro ao salvar transação');
+        setIsModalOpen(true); // Reopen if failed
       }
     } catch (error) {
       console.error('Error adding transaction:', error);
+      alert('Erro de conexão');
+      setIsModalOpen(true);
     }
   };
 
-  const handleDelete = async (id: number, e: React.MouseEvent) => {
+  const confirmDelete = (id: number, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm('Tem certeza que deseja excluir esta transação?')) return;
+    setTransactionToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (transactionToDelete === null) return;
+    
+    const id = transactionToDelete;
+    setIsDeleteModalOpen(false);
+    setTransactionToDelete(null);
+
+    // Optimistic Update: Remove from UI immediately
+    const originalTransactions = [...transactions];
+    setTransactions(prev => prev.filter(t => t.id !== id));
+
     try {
       const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        fetchTransactions();
+      if (!res.ok) {
+        // Rollback if server fails
+        setTransactions(originalTransactions);
+        alert('Erro ao excluir a transação no servidor.');
       }
     } catch (error) {
       console.error('Error deleting transaction:', error);
+      setTransactions(originalTransactions);
+      alert('Erro de conexão ao tentar excluir.');
     }
   };
 
@@ -351,7 +396,7 @@ export default function App() {
                       </span>
                       <button 
                         type="button"
-                        onClick={(e) => handleDelete(t.id, e)}
+                        onClick={(e) => confirmDelete(t.id, e)}
                         className="text-slate-400 hover:text-rose-600 p-3 -mr-2 rounded-lg active:bg-rose-50 transition-all"
                         title="Excluir transação"
                       >
@@ -403,7 +448,7 @@ export default function App() {
                         <td className="px-6 py-4 text-right">
                           <button 
                             type="button"
-                            onClick={(e) => handleDelete(t.id, e)}
+                            onClick={(e) => confirmDelete(t.id, e)}
                             className="text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition-all inline-flex items-center justify-center"
                             title="Excluir transação"
                           >
@@ -685,6 +730,46 @@ export default function App() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Modal Confirmação de Exclusão */}
+      <AnimatePresence>
+        {isDeleteModalOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsDeleteModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center"
+            >
+              <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Excluir Transação?</h3>
+              <p className="text-slate-500 mb-6">Esta ação não pode ser desfeita. Tem certeza que deseja apagar este item?</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 px-4 py-3 rounded-xl bg-rose-600 text-white font-bold shadow-lg shadow-rose-200 hover:bg-rose-700 transition-all active:scale-95"
+                >
+                  Sim, Apagar
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
