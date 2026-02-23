@@ -534,14 +534,14 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-visible"
             >
-              <div className="p-4 sm:p-6 border-b border-slate-100 shrink-0">
+              <div className="p-4 sm:p-6 border-b border-slate-100 shrink-0 bg-white rounded-t-2xl sm:rounded-t-3xl">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900">Nova Transação</h2>
                 <p className="text-xs sm:text-sm text-slate-500">Adicione uma nova entrada ou saída</p>
               </div>
               
-              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto pb-20">
                 <div className="flex p-1 bg-slate-100 rounded-xl">
                   <button
                     type="button"
@@ -644,11 +644,11 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className="relative">
+                    <div className="relative z-10">
                       <select
                         value={formData.category}
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer pr-10"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer pr-10 text-slate-900"
                       >
                         {categories
                           .filter(c => c.type === formData.type)
