@@ -13,7 +13,8 @@ import {
   PieChart as PieChartIcon,
   LayoutDashboard,
   History,
-  ChevronDown
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -53,6 +54,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<number | null>(null);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -69,6 +71,25 @@ export default function App() {
     isRecurring: false,
     installments: 1,
   });
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as HTMLElement;
+      if (isCategoryDropdownOpen && !target.closest('.category-dropdown-container')) {
+        setIsCategoryDropdownOpen(false);
+      }
+    };
+
+    if (isCategoryDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isCategoryDropdownOpen]);
 
   useEffect(() => {
     fetchData();
@@ -600,134 +621,189 @@ export default function App() {
                 <p className="text-xs sm:text-sm text-slate-500">Adicione uma nova entrada ou saída</p>
               </div>
               
-              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto pb-40">
-                <div className="flex p-1 bg-slate-100 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const firstExpense = categories.find(c => c.type === 'expense')?.name || 'Outros';
-                      setFormData({ ...formData, type: 'expense', category: firstExpense });
-                      setIsAddingCategory(false);
-                    }}
-                    className={cn(
-                      "flex-1 py-2 text-sm font-semibold rounded-lg transition-all",
-                      formData.type === 'expense' ? "bg-white text-rose-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                    )}
-                  >
-                    Despesa
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const firstIncome = categories.find(c => c.type === 'income')?.name || 'Outros';
-                      setFormData({ ...formData, type: 'income', category: firstIncome });
-                      setIsAddingCategory(false);
-                    }}
-                    className={cn(
-                      "flex-1 py-2 text-sm font-semibold rounded-lg transition-all",
-                      formData.type === 'income' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                    )}
-                  >
-                    Receita
-                  </button>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição</label>
-                  <input
-                    required
-                    type="text"
-                    placeholder="Ex: Aluguel, Supermercado..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Valor</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">R$</span>
-                      <input
-                        required
-                        type="number"
-                        step="0.01"
-                        placeholder="0,00"
-                        value={formData.amount || ''}
-                        onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
-                      />
-                    </div>
+              <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+                  <div className="flex p-1 bg-slate-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const firstExpense = categories.find(c => c.type === 'expense')?.name || 'Outros';
+                        setFormData({ ...formData, type: 'expense', category: firstExpense });
+                        setIsAddingCategory(false);
+                      }}
+                      className={cn(
+                        "flex-1 py-2 text-sm font-semibold rounded-lg transition-all",
+                        formData.type === 'expense' ? "bg-white text-rose-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      Despesa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const firstIncome = categories.find(c => c.type === 'income')?.name || 'Outros';
+                        setFormData({ ...formData, type: 'income', category: firstIncome });
+                        setIsAddingCategory(false);
+                      }}
+                      className={cn(
+                        "flex-1 py-2 text-sm font-semibold rounded-lg transition-all",
+                        formData.type === 'income' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      Receita
+                    </button>
                   </div>
+
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Data</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição</label>
                     <input
                       required
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      type="text"
+                      placeholder="Ex: Aluguel, Supermercado..."
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                     />
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
-                    <button 
-                      type="button"
-                      onClick={() => setIsAddingCategory(!isAddingCategory)}
-                      className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded"
-                    >
-                      {isAddingCategory ? 'Voltar para lista' : '+ Nova Categoria'}
-                    </button>
-                  </div>
-                  
-                  {isAddingCategory ? (
-                    <div className="flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Valor</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">R$</span>
+                        <input
+                          required
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={formData.amount || ''}
+                          onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                          className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Data</label>
                       <input
-                        autoFocus
-                        type="text"
-                        placeholder="Nome da nova categoria"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-base bg-slate-50"
+                        required
+                        type="date"
+                        value={formData.date}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                       />
-                      <button
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
+                      <button 
                         type="button"
-                        onClick={handleAddCategory}
-                        className="px-6 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                        onClick={() => {
+                          setIsAddingCategory(!isAddingCategory);
+                          setIsCategoryDropdownOpen(false);
+                        }}
+                        className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded"
                       >
-                        Add
+                        {isAddingCategory ? 'Voltar para lista' : '+ Nova Categoria'}
                       </button>
                     </div>
-                  ) : (
-                    <div className="relative z-10">
-                      <select
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer text-slate-900 text-base min-h-[54px] block appearance-none shadow-sm relative z-20"
-                        style={{ 
-                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                          backgroundPosition: 'right 1rem center',
-                          backgroundRepeat: 'no-repeat',
-                          backgroundSize: '1.5em 1.5em',
-                          paddingRight: '3rem'
-                        }}
-                      >
-                        <option value="" disabled>Selecione uma categoria</option>
-                        {categories
-                          .filter(c => c.type === formData.type)
-                          .map(cat => (
-                            <option key={cat.id} value={cat.name} className="text-slate-900 bg-white">{cat.name}</option>
-                          ))}
-                      </select>
-                    </div>
-                  )}
+                    
+                    {isAddingCategory ? (
+                      <div className="flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="Nome da nova categoria"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-base bg-slate-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddCategory}
+                          className="px-6 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="relative category-dropdown-container">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                          }}
+                          className="w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-left flex items-center justify-between text-slate-900 text-base min-h-[54px] shadow-sm hover:border-emerald-300 transition-colors relative z-20"
+                        >
+                          <span className={formData.category ? "text-slate-900" : "text-slate-400"}>
+                            {formData.category || 'Selecione uma categoria'}
+                          </span>
+                          <ChevronDown size={20} className={cn("text-slate-400 transition-transform", isCategoryDropdownOpen && "rotate-180")} />
+                        </button>
+                        
+                        <AnimatePresence>
+                          {isCategoryDropdownOpen && (
+                            <>
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className={cn(
+                                  "fixed inset-x-0 bottom-0 z-[100] bg-white rounded-t-3xl shadow-2xl p-4 sm:absolute sm:inset-auto sm:top-full sm:left-0 sm:right-0 sm:bottom-auto sm:mt-2 sm:rounded-xl sm:p-0 sm:max-h-60 sm:overflow-y-auto",
+                                  "max-h-[70vh] overflow-y-auto"
+                                )}
+                              >
+                                <div className="flex items-center justify-between mb-4 sm:hidden">
+                                  <h4 className="font-bold text-slate-900">Selecionar Categoria</h4>
+                                  <button 
+                                    type="button"
+                                    onClick={() => setIsCategoryDropdownOpen(false)}
+                                    className="p-2 bg-slate-100 rounded-full"
+                                  >
+                                    <ChevronDown size={20} />
+                                  </button>
+                                </div>
+                                <div className="space-y-1 sm:space-y-0">
+                                  {categories
+                                    .filter(c => c.type === formData.type)
+                                    .map(cat => (
+                                      <button
+                                        key={cat.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setFormData({ ...formData, category: cat.name });
+                                          setIsCategoryDropdownOpen(false);
+                                        }}
+                                        className={cn(
+                                          "w-full px-4 py-4 sm:py-3 text-left text-base sm:text-sm transition-colors flex items-center justify-between border-b border-slate-50 last:border-0 sm:border-0",
+                                          formData.category === cat.name ? "bg-emerald-50 text-emerald-700 font-semibold" : "hover:bg-slate-50 text-slate-700"
+                                        )}
+                                      >
+                                        {cat.name}
+                                        {formData.category === cat.name && <Check size={18} className="text-emerald-600" />}
+                                      </button>
+                                    ))}
+                                </div>
+                              </motion.div>
+                              <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setIsCategoryDropdownOpen(false)}
+                                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[90] sm:hidden"
+                              />
+                            </>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 shrink-0 rounded-b-2xl sm:rounded-b-3xl space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <History size={18} className="text-slate-400" />
@@ -770,25 +846,25 @@ export default function App() {
                       </p>
                     </motion.div>
                   )}
-                </div>
 
-                <div className="pt-4 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-all"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className={cn(
-                      "flex-[2] px-4 py-3 rounded-xl text-white font-bold shadow-lg transition-all active:scale-95",
-                      formData.type === 'income' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200" : "bg-rose-600 hover:bg-rose-700 shadow-rose-200"
-                    )}
-                  >
-                    Salvar Transação
-                  </button>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className={cn(
+                        "flex-[2] px-4 py-3 rounded-xl text-white font-bold shadow-lg transition-all active:scale-95",
+                        formData.type === 'income' ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200" : "bg-rose-600 hover:bg-rose-700 shadow-rose-200"
+                      )}
+                    >
+                      Salvar Transação
+                    </button>
+                  </div>
                 </div>
               </form>
             </motion.div>
