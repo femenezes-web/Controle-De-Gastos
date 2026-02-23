@@ -13,8 +13,7 @@ import {
   PieChart as PieChartIcon,
   LayoutDashboard,
   History,
-  ChevronDown,
-  X
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -54,7 +53,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<number | null>(null);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -71,23 +69,6 @@ export default function App() {
     isRecurring: false,
     installments: 1,
   });
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as HTMLElement;
-      if (isCategoryDropdownOpen && !target.closest('.category-dropdown-container')) {
-        setIsCategoryDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [isCategoryDropdownOpen]);
 
   useEffect(() => {
     fetchData();
@@ -201,7 +182,6 @@ export default function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsModalOpen(false);
-    setIsCategoryDropdownOpen(false);
     
     if (isDemoMode) {
       const newT = { ...formData, id: Date.now() } as Transaction;
@@ -697,10 +677,7 @@ export default function App() {
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
                     <button 
                       type="button"
-                      onClick={() => {
-                        setIsAddingCategory(!isAddingCategory);
-                        setIsCategoryDropdownOpen(false);
-                      }}
+                      onClick={() => setIsAddingCategory(!isAddingCategory)}
                       className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded"
                     >
                       {isAddingCategory ? 'Voltar para lista' : '+ Nova Categoria'}
@@ -726,51 +703,26 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className="relative category-dropdown-container">
-                      <button
-                        type="button"
-                        onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                        className="w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-left flex items-center justify-between text-slate-900 text-base min-h-[54px] shadow-sm hover:border-emerald-300 transition-colors"
+                    <div className="relative z-10">
+                      <select
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer text-slate-900 text-base min-h-[54px] block appearance-none shadow-sm relative z-20"
+                        style={{ 
+                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                          backgroundPosition: 'right 1rem center',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundSize: '1.5em 1.5em',
+                          paddingRight: '3rem'
+                        }}
                       >
-                        <span className={formData.category ? "text-slate-900" : "text-slate-400"}>
-                          {formData.category || 'Selecione uma categoria'}
-                        </span>
-                        <ChevronDown size={20} className={cn("text-slate-400 transition-transform", isCategoryDropdownOpen && "rotate-180")} />
-                      </button>
-                      
-                      <AnimatePresence>
-                        {isCategoryDropdownOpen && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="absolute z-[70] top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto py-2"
-                          >
-                            {categories
-                              .filter(c => c.type === formData.type)
-                              .map(cat => (
-                                <button
-                                  key={cat.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setFormData({ ...formData, category: cat.name });
-                                    setIsCategoryDropdownOpen(false);
-                                  }}
-                                  className={cn(
-                                    "w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between",
-                                    formData.category === cat.name ? "bg-emerald-50 text-emerald-700 font-semibold" : "hover:bg-slate-50 text-slate-700"
-                                  )}
-                                >
-                                  {cat.name}
-                                  {formData.category === cat.name && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
-                                </button>
-                              ))}
-                            {categories.filter(c => c.type === formData.type).length === 0 && (
-                              <div className="px-4 py-3 text-sm text-slate-400 italic">Nenhuma categoria encontrada</div>
-                            )}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                        <option value="" disabled>Selecione uma categoria</option>
+                        {categories
+                          .filter(c => c.type === formData.type)
+                          .map(cat => (
+                            <option key={cat.id} value={cat.name} className="text-slate-900 bg-white">{cat.name}</option>
+                          ))}
+                      </select>
                     </div>
                   )}
                 </div>
