@@ -35,7 +35,20 @@ import { cn, formatCurrency } from './lib/utils';
 
 export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>([
+    { id: -1, name: 'Salário', type: 'income' },
+    { id: -2, name: 'Investimentos', type: 'income' },
+    { id: -3, name: 'Presente', type: 'income' },
+    { id: -4, name: 'Outros', type: 'income' },
+    { id: -5, name: 'Alimentação', type: 'expense' },
+    { id: -6, name: 'Moradia', type: 'expense' },
+    { id: -7, name: 'Transporte', type: 'expense' },
+    { id: -8, name: 'Lazer', type: 'expense' },
+    { id: -9, name: 'Saúde', type: 'expense' },
+    { id: -10, name: 'Educação', type: 'expense' },
+    { id: -11, name: 'Compras', type: 'expense' },
+    { id: -12, name: 'Outros', type: 'expense' },
+  ]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -49,7 +62,7 @@ export default function App() {
     description: '',
     amount: 0,
     type: 'expense',
-    category: '',
+    category: 'Alimentação',
     date: format(new Date(), 'yyyy-MM-dd'),
     isRecurring: false,
     installments: 1,
@@ -644,22 +657,20 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className="relative z-10">
+                    <div className="relative z-20">
                       <select
                         value={formData.category}
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer pr-10 text-slate-900"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer pr-10 text-slate-900 text-base min-h-[48px] block"
+                        style={{ WebkitAppearance: 'menulist' }}
                       >
                         {categories
                           .filter(c => c.type === formData.type)
                           .map(cat => (
                             <option key={cat.id} value={cat.name}>{cat.name}</option>
                           ))}
-                        {categories.filter(c => c.type === formData.type).length === 0 && (
-                          <option value="">Nenhuma categoria encontrada</option>
-                        )}
                       </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 z-30">
                         <Filter size={16} />
                       </div>
                     </div>
