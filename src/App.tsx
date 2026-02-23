@@ -57,6 +57,7 @@ export default function App() {
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<number | null>(null);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [isDemoMode, setIsDemoMode] = useState(false);
   
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -72,19 +73,19 @@ export default function App() {
   });
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       const target = event.target as HTMLElement;
-      if (!target.closest('.category-dropdown-container')) {
+      if (isCategoryDropdownOpen && !target.closest('.category-dropdown-container')) {
         setIsCategoryDropdownOpen(false);
       }
     };
 
-    if (isCategoryDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [isCategoryDropdownOpen]);
 
@@ -94,19 +95,32 @@ export default function App() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [_, cats] = await Promise.all([fetchTransactions(), fetchCategories()]);
-    if (cats && cats.length > 0) {
-      const firstExpense = cats.find((c: Category) => c.type === 'expense')?.name;
-      if (firstExpense) {
-        setFormData(prev => ({ ...prev, category: firstExpense }));
+    try {
+      // Check if we are on a static host like Netlify
+      const healthCheck = await fetch('/api/categories').catch(() => ({ ok: false }));
+      if (!healthCheck.ok) {
+        setIsDemoMode(true);
+        const localTransactions = localStorage.getItem('demo_transactions');
+        if (localTransactions) setTransactions(JSON.parse(localTransactions));
+        
+        const localCategories = localStorage.getItem('demo_categories');
+        if (localCategories) {
+          setCategories(JSON.parse(localCategories));
+        }
+      } else {
+        await Promise.all([fetchTransactions(), fetchCategories()]);
       }
+    } catch (e) {
+      setIsDemoMode(true);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchTransactions = async () => {
     try {
       const res = await fetch('/api/transactions');
+      if (!res.ok) return;
       const data = await res.json();
       setTransactions(data);
       return data;
@@ -137,8 +151,6 @@ export default function App() {
       const data = await res.json();
       
       const serverCats = Array.isArray(data) ? data : [];
-      
-      // Merge server categories with fallbacks, avoiding duplicates
       const merged = [...serverCats];
       fallbacks.forEach(fb => {
         if (!merged.some(m => m.name.toLowerCase() === fb.name.toLowerCase() && m.type === fb.type)) {
@@ -149,7 +161,6 @@ export default function App() {
       setCategories(merged);
       return merged;
     } catch (error) {
-      console.error('Error fetching categories, using fallbacks:', error);
       setCategories(fallbacks);
       return fallbacks;
     }
@@ -157,6 +168,18 @@ export default function App() {
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return;
+    
+    if (isDemoMode) {
+      const newCat = { id: Date.now(), name: newCategoryName, type: formData.type };
+      const updated = [...categories, newCat];
+      setCategories(updated);
+      localStorage.setItem('demo_categories', JSON.stringify(updated));
+      setFormData({ ...formData, category: newCat.name });
+      setIsAddingCategory(false);
+      setNewCategoryName('');
+      return;
+    }
+
     try {
       const res = await fetch('/api/categories', {
         method: 'POST',
@@ -169,9 +192,6 @@ export default function App() {
         setFormData({ ...formData, category: newCat.name });
         setIsAddingCategory(false);
         setNewCategoryName('');
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Erro ao adicionar categoria');
       }
     } catch (error) {
       console.error('Error adding category:', error);
@@ -180,10 +200,18 @@ export default function App() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Instant close for better UX
     setIsModalOpen(false);
     setIsCategoryDropdownOpen(false);
     
+    if (isDemoMode) {
+      const newT = { ...formData, id: Date.now() } as Transaction;
+      const updated = [newT, ...transactions];
+      setTransactions(updated);
+      localStorage.setItem('demo_transactions', JSON.stringify(updated));
+      resetForm();
+      return;
+    }
+
     try {
       const res = await fetch('/api/transactions', {
         method: 'POST',
@@ -193,25 +221,28 @@ export default function App() {
       
       if (res.ok) {
         fetchTransactions();
-        const firstExpense = categories.find(c => c.type === 'expense')?.name || 'Outros';
-        setFormData({
-          description: '',
-          amount: 0,
-          type: 'expense',
-          category: firstExpense,
-          date: format(new Date(), 'yyyy-MM-dd'),
-          isRecurring: false,
-          installments: 1,
-        });
+        resetForm();
       } else {
         alert('Erro ao salvar transação');
-        setIsModalOpen(true); // Reopen if failed
+        setIsModalOpen(true);
       }
     } catch (error) {
       console.error('Error adding transaction:', error);
-      alert('Erro de conexão');
       setIsModalOpen(true);
     }
+  };
+
+  const resetForm = () => {
+    const firstExpense = categories.find(c => c.type === 'expense')?.name || 'Outros';
+    setFormData({
+      description: '',
+      amount: 0,
+      type: 'expense',
+      category: firstExpense,
+      date: format(new Date(), 'yyyy-MM-dd'),
+      isRecurring: false,
+      installments: 1,
+    });
   };
 
   const confirmDelete = (id: number, e: React.MouseEvent) => {
@@ -228,19 +259,21 @@ export default function App() {
     setIsDeleteModalOpen(false);
     setTransactionToDelete(null);
 
-    // Optimistic Update: Remove from UI immediately
     const originalTransactions = [...transactions];
     setTransactions(prev => prev.filter(t => t.id !== id));
+
+    if (isDemoMode) {
+      localStorage.setItem('demo_transactions', JSON.stringify(transactions.filter(t => t.id !== id)));
+      return;
+    }
 
     try {
       const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
       if (!res.ok) {
-        // Rollback if server fails
         setTransactions(originalTransactions);
         alert('Erro ao excluir a transação no servidor.');
       }
     } catch (error) {
-      console.error('Error deleting transaction:', error);
       setTransactions(originalTransactions);
       alert('Erro de conexão ao tentar excluir.');
     }
