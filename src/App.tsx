@@ -657,12 +657,18 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <div className="relative z-20">
+                    <div className="relative">
                       <select
                         value={formData.category}
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer pr-10 text-slate-900 text-base min-h-[48px] block"
-                        style={{ WebkitAppearance: 'menulist' }}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer text-slate-900 text-base min-h-[50px] block appearance-none"
+                        style={{ 
+                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                          backgroundPosition: 'right 1rem center',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundSize: '1.5em 1.5em',
+                          paddingRight: '2.5rem'
+                        }}
                       >
                         {categories
                           .filter(c => c.type === formData.type)
@@ -670,9 +676,6 @@ export default function App() {
                             <option key={cat.id} value={cat.name}>{cat.name}</option>
                           ))}
                       </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 z-30">
-                        <Filter size={16} />
-                      </div>
                     </div>
                   )}
                 </div>
