@@ -141,11 +141,15 @@ export default function App() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir esta transação?')) return;
+  const handleDelete = async (id: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm('Tem certeza que deseja excluir esta transação?')) return;
     try {
       const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
-      if (res.ok) fetchTransactions();
+      if (res.ok) {
+        fetchTransactions();
+      }
     } catch (error) {
       console.error('Error deleting transaction:', error);
     }
@@ -181,30 +185,32 @@ export default function App() {
     <div className="min-h-screen bg-[#f8f9fa] pb-12">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-              <Wallet size={24} />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
+              <Wallet size={18} className="sm:hidden" />
+              <Wallet size={24} className="hidden sm:block" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">FinTrack</h1>
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 truncate">FinTrack</h1>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-              <Calendar size={16} className="text-slate-500" />
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-1 sm:gap-2 bg-slate-100 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200">
+              <Calendar size={14} className="text-slate-500 sm:hidden" />
+              <Calendar size={16} className="text-slate-500 hidden sm:block" />
               <input 
                 type="month" 
                 value={filterMonth}
                 onChange={(e) => setFilterMonth(e.target.value)}
-                className="bg-transparent border-none text-sm font-medium focus:ring-0 cursor-pointer"
+                className="bg-transparent border-none text-[12px] sm:text-sm font-medium focus:ring-0 cursor-pointer w-[100px] sm:w-auto"
               />
             </div>
             <button 
               onClick={() => setIsModalOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all shadow-md hover:shadow-lg active:scale-95"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white p-2 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl flex items-center gap-2 transition-all shadow-md hover:shadow-lg active:scale-95"
             >
               <Plus size={20} />
-              <span className="hidden sm:inline">Nova Transação</span>
+              <span className="hidden md:inline">Nova Transação</span>
             </button>
           </div>
         </div>
@@ -212,36 +218,38 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"
+            className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-                <TrendingUp size={24} />
+                <TrendingUp size={20} className="sm:hidden" />
+                <TrendingUp size={24} className="hidden sm:block" />
               </div>
-              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Entradas</span>
+              <span className="text-[10px] sm:text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Entradas</span>
             </div>
-            <p className="text-sm text-slate-500 font-medium">Total Recebido</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(totals.income)}</h3>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">Total Recebido</p>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{formatCurrency(totals.income)}</h3>
           </motion.div>
 
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"
+            className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
-                <TrendingDown size={24} />
+                <TrendingDown size={20} className="sm:hidden" />
+                <TrendingDown size={24} className="hidden sm:block" />
               </div>
-              <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-1 rounded-full">Saídas</span>
+              <span className="text-[10px] sm:text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-1 rounded-full">Saídas</span>
             </div>
-            <p className="text-sm text-slate-500 font-medium">Total Gasto</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(totals.expense)}</h3>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">Total Gasto</p>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">{formatCurrency(totals.expense)}</h3>
           </motion.div>
 
           <motion.div 
@@ -249,18 +257,19 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             className={cn(
-              "p-6 rounded-2xl border shadow-sm transition-colors",
+              "p-4 sm:p-6 rounded-2xl border shadow-sm transition-colors sm:col-span-2 lg:col-span-1",
               balance >= 0 ? "bg-emerald-600 border-emerald-500 text-white" : "bg-rose-600 border-rose-500 text-white"
             )}
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
               <div className="p-2 bg-white/20 rounded-lg">
-                <Wallet size={24} />
+                <Wallet size={20} className="sm:hidden" />
+                <Wallet size={24} className="hidden sm:block" />
               </div>
-              <span className="text-xs font-semibold bg-white/20 px-2 py-1 rounded-full">Saldo Atual</span>
+              <span className="text-[10px] sm:text-xs font-semibold bg-white/20 px-2 py-1 rounded-full">Saldo Atual</span>
             </div>
-            <p className="text-sm text-white/80 font-medium">Disponível</p>
-            <h3 className="text-2xl font-bold mt-1">{formatCurrency(balance)}</h3>
+            <p className="text-xs sm:text-sm text-white/80 font-medium">Disponível</p>
+            <h3 className="text-xl sm:text-2xl font-bold mt-1">{formatCurrency(balance)}</h3>
           </motion.div>
         </div>
 
@@ -309,7 +318,7 @@ export default function App() {
 
             {/* Recent Transactions */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <History size={20} className="text-slate-400" />
                   <h2 className="text-lg font-bold text-slate-900">Histórico</h2>
@@ -318,7 +327,48 @@ export default function App() {
                   {filteredTransactions.length} transações
                 </span>
               </div>
-              <div className="overflow-x-auto">
+
+              {/* Mobile List View */}
+              <div className="block sm:hidden divide-y divide-slate-100">
+                {filteredTransactions.map((t) => (
+                  <div key={t.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-slate-500">
+                        {format(parseISO(t.date), 'dd MMM', { locale: ptBR })}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900">{t.description}</span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                        <Tag size={10} />
+                        {t.category}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={cn(
+                        "text-sm font-bold",
+                        t.type === 'income' ? "text-emerald-600" : "text-rose-600"
+                      )}>
+                        {t.type === 'income' ? '+' : '-'} {formatCurrency(t.amount)}
+                      </span>
+                      <button 
+                        type="button"
+                        onClick={(e) => handleDelete(t.id, e)}
+                        className="text-slate-400 hover:text-rose-600 p-3 -mr-2 rounded-lg active:bg-rose-50 transition-all"
+                        title="Excluir transação"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {filteredTransactions.length === 0 && (
+                  <div className="p-8 text-center text-slate-400 text-sm">
+                    Nenhuma transação encontrada.
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50">
@@ -352,8 +402,10 @@ export default function App() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button 
-                            onClick={() => handleDelete(t.id)}
-                            className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
+                            type="button"
+                            onClick={(e) => handleDelete(t.id, e)}
+                            className="text-slate-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition-all inline-flex items-center justify-center"
+                            title="Excluir transação"
                           >
                             <Trash2 size={18} />
                           </button>
@@ -437,14 +489,14 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="p-6 border-b border-slate-100">
-                <h2 className="text-xl font-bold text-slate-900">Nova Transação</h2>
-                <p className="text-sm text-slate-500">Adicione uma nova entrada ou saída</p>
+              <div className="p-4 sm:p-6 border-b border-slate-100 shrink-0">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900">Nova Transação</h2>
+                <p className="text-xs sm:text-sm text-slate-500">Adicione uma nova entrada ou saída</p>
               </div>
               
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
                 <div className="flex p-1 bg-slate-100 rounded-xl">
                   <button
                     type="button"
@@ -547,17 +599,25 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all appearance-none bg-white"
-                    >
-                      {categories
-                        .filter(c => c.type === formData.type)
-                        .map(cat => (
-                          <option key={cat.id} value={cat.name}>{cat.name}</option>
-                        ))}
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer pr-10"
+                      >
+                        {categories
+                          .filter(c => c.type === formData.type)
+                          .map(cat => (
+                            <option key={cat.id} value={cat.name}>{cat.name}</option>
+                          ))}
+                        {categories.filter(c => c.type === formData.type).length === 0 && (
+                          <option value="">Nenhuma categoria encontrada</option>
+                        )}
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                        <Filter size={16} />
+                      </div>
+                    </div>
                   )}
                 </div>
 
