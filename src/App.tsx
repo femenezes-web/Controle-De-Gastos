@@ -96,28 +96,38 @@ export default function App() {
   };
 
   const fetchCategories = async () => {
+    const fallbacks: Category[] = [
+      { id: -1, name: 'Salário', type: 'income' },
+      { id: -2, name: 'Investimentos', type: 'income' },
+      { id: -3, name: 'Presente', type: 'income' },
+      { id: -4, name: 'Outros', type: 'income' },
+      { id: -5, name: 'Alimentação', type: 'expense' },
+      { id: -6, name: 'Moradia', type: 'expense' },
+      { id: -7, name: 'Transporte', type: 'expense' },
+      { id: -8, name: 'Lazer', type: 'expense' },
+      { id: -9, name: 'Saúde', type: 'expense' },
+      { id: -10, name: 'Educação', type: 'expense' },
+      { id: -11, name: 'Compras', type: 'expense' },
+      { id: -12, name: 'Outros', type: 'expense' },
+    ];
+
     try {
       const res = await fetch('/api/categories');
       if (!res.ok) throw new Error('API offline');
       const data = await res.json();
-      setCategories(data);
-      return data;
+      
+      // Merge server categories with fallbacks, avoiding duplicates
+      const merged = [...data];
+      fallbacks.forEach(fb => {
+        if (!merged.some(m => m.name.toLowerCase() === fb.name.toLowerCase() && m.type === fb.type)) {
+          merged.push(fb);
+        }
+      });
+      
+      setCategories(merged);
+      return merged;
     } catch (error) {
       console.error('Error fetching categories, using fallbacks:', error);
-      const fallbacks: Category[] = [
-        { id: -1, name: 'Salário', type: 'income' },
-        { id: -2, name: 'Investimentos', type: 'income' },
-        { id: -3, name: 'Presente', type: 'income' },
-        { id: -4, name: 'Outros', type: 'income' },
-        { id: -5, name: 'Alimentação', type: 'expense' },
-        { id: -6, name: 'Moradia', type: 'expense' },
-        { id: -7, name: 'Transporte', type: 'expense' },
-        { id: -8, name: 'Lazer', type: 'expense' },
-        { id: -9, name: 'Saúde', type: 'expense' },
-        { id: -10, name: 'Educação', type: 'expense' },
-        { id: -11, name: 'Compras', type: 'expense' },
-        { id: -12, name: 'Outros', type: 'expense' },
-      ];
       setCategories(fallbacks);
       return fallbacks;
     }
@@ -626,50 +636,51 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
                     <button 
                       type="button"
                       onClick={() => setIsAddingCategory(!isAddingCategory)}
-                      className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider"
+                      className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded"
                     >
-                      {isAddingCategory ? 'Cancelar' : '+ Nova Categoria'}
+                      {isAddingCategory ? 'Voltar para lista' : '+ Nova Categoria'}
                     </button>
                   </div>
                   
                   {isAddingCategory ? (
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
                       <input
                         autoFocus
                         type="text"
-                        placeholder="Nome da categoria"
+                        placeholder="Nome da nova categoria"
                         value={newCategoryName}
                         onChange={(e) => setNewCategoryName(e.target.value)}
-                        className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-sm"
+                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-base bg-slate-50"
                       />
                       <button
                         type="button"
                         onClick={handleAddCategory}
-                        className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all"
+                        className="px-6 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-md active:scale-95"
                       >
                         Add
                       </button>
                     </div>
                   ) : (
-                    <div className="relative">
+                    <div className="relative group">
                       <select
                         value={formData.category}
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer text-slate-900 text-base min-h-[50px] block appearance-none"
+                        className="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all bg-white cursor-pointer text-slate-900 text-base min-h-[54px] block appearance-none shadow-sm"
                         style={{ 
                           backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                           backgroundPosition: 'right 1rem center',
                           backgroundRepeat: 'no-repeat',
                           backgroundSize: '1.5em 1.5em',
-                          paddingRight: '2.5rem'
+                          paddingRight: '3rem'
                         }}
                       >
+                        <option value="" disabled>Selecione uma categoria</option>
                         {categories
                           .filter(c => c.type === formData.type)
                           .map(cat => (
