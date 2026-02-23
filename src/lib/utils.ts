@@ -11,17 +11,3 @@ export const formatCurrency = (value: number) => {
     currency: "BRL",
   }).format(value);
 };
-
-export const CATEGORIES = {
-  income: ["Salário", "Investimentos", "Presente", "Outros"],
-  expense: [
-    "Alimentação",
-    "Moradia",
-    "Transporte",
-    "Lazer",
-    "Saúde",
-    "Educação",
-    "Compras",
-    "Outros",
-  ],
-};

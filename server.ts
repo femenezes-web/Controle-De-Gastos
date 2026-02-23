@@ -21,8 +21,28 @@ db.exec(`
     is_recurring INTEGER DEFAULT 0,
     installments INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
+  );
+
+  CREATE TABLE IF NOT EXISTS categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT CHECK(type IN ('income', 'expense')) NOT NULL,
+    UNIQUE(name, type)
+  );
 `);
+
+// Seed default categories if empty
+const categoryCount = db.prepare("SELECT COUNT(*) as count FROM categories").get() as { count: number };
+if (categoryCount.count === 0) {
+  const defaultCategories = {
+    income: ["Salário", "Investimentos", "Presente", "Outros"],
+    expense: ["Alimentação", "Moradia", "Transporte", "Lazer", "Saúde", "Educação", "Compras", "Outros"],
+  };
+
+  const insertCategory = db.prepare("INSERT INTO categories (name, type) VALUES (?, ?)");
+  for (const name of defaultCategories.income) insertCategory.run(name, "income");
+  for (const name of defaultCategories.expense) insertCategory.run(name, "expense");
+}
 
 // Ensure columns exist if table was already created
 try {
@@ -39,6 +59,29 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
+  app.get("/api/categories", (req, res) => {
+    try {
+      const categories = db.prepare("SELECT * FROM categories ORDER BY name ASC").all();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  app.post("/api/categories", (req, res) => {
+    const { name, type } = req.body;
+    try {
+      const info = db.prepare("INSERT INTO categories (name, type) VALUES (?, ?)").run(name, type);
+      res.json({ id: info.lastInsertRowid, name, type });
+    } catch (error) {
+      if ((error as any).code === 'SQLITE_CONSTRAINT') {
+        res.status(400).json({ error: "Category already exists" });
+      } else {
+        res.status(500).json({ error: "Failed to add category" });
+      }
+    }
+  });
+
   app.get("/api/transactions", (req, res) => {
     try {
       const transactions = db.prepare("SELECT * FROM transactions ORDER BY date DESC, id DESC").all();

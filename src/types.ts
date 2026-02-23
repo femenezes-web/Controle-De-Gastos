@@ -1,3 +1,9 @@
+export interface Category {
+  id: number;
+  name: string;
+  type: 'income' | 'expense';
+}
+
 export interface Transaction {
   id: number;
   description: string;

@@ -30,15 +30,19 @@ import {
 } from 'recharts';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Transaction, NewTransaction } from './types';
-import { cn, formatCurrency, CATEGORIES } from './lib/utils';
+import { Transaction, NewTransaction, Category } from './types';
+import { cn, formatCurrency } from './lib/utils';
 
 export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
   const [formData, setFormData] = useState<NewTransaction>({
     description: '',
     amount: 0,
@@ -50,18 +54,63 @@ export default function App() {
   });
 
   useEffect(() => {
-    fetchTransactions();
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const [_, cats] = await Promise.all([fetchTransactions(), fetchCategories()]);
+    if (cats && cats.length > 0) {
+      const firstExpense = cats.find((c: Category) => c.type === 'expense')?.name;
+      if (firstExpense) {
+        setFormData(prev => ({ ...prev, category: firstExpense }));
+      }
+    }
+    setLoading(false);
+  };
 
   const fetchTransactions = async () => {
     try {
       const res = await fetch('/api/transactions');
       const data = await res.json();
       setTransactions(data);
+      return data;
     } catch (error) {
       console.error('Error fetching transactions:', error);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/categories');
+      const data = await res.json();
+      setCategories(data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCategoryName, type: formData.type }),
+      });
+      if (res.ok) {
+        const newCat = await res.json();
+        setCategories([...categories, newCat]);
+        setFormData({ ...formData, category: newCat.name });
+        setIsAddingCategory(false);
+        setNewCategoryName('');
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Erro ao adicionar categoria');
+      }
+    } catch (error) {
+      console.error('Error adding category:', error);
     }
   };
 
@@ -76,11 +125,12 @@ export default function App() {
       if (res.ok) {
         fetchTransactions();
         setIsModalOpen(false);
+        const firstExpense = categories.find(c => c.type === 'expense')?.name || 'Outros';
         setFormData({
           description: '',
           amount: 0,
           type: 'expense',
-          category: 'Alimentação',
+          category: firstExpense,
           date: format(new Date(), 'yyyy-MM-dd'),
           isRecurring: false,
           installments: 1,
@@ -399,7 +449,9 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setFormData({ ...formData, type: 'expense', category: CATEGORIES.expense[0] });
+                      const firstExpense = categories.find(c => c.type === 'expense')?.name || 'Outros';
+                      setFormData({ ...formData, type: 'expense', category: firstExpense });
+                      setIsAddingCategory(false);
                     }}
                     className={cn(
                       "flex-1 py-2 text-sm font-semibold rounded-lg transition-all",
@@ -411,7 +463,9 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setFormData({ ...formData, type: 'income', category: CATEGORIES.income[0] });
+                      const firstIncome = categories.find(c => c.type === 'income')?.name || 'Outros';
+                      setFormData({ ...formData, type: 'income', category: firstIncome });
+                      setIsAddingCategory(false);
                     }}
                     className={cn(
                       "flex-1 py-2 text-sm font-semibold rounded-lg transition-all",
@@ -463,23 +517,57 @@ export default function App() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all appearance-none bg-white"
-                  >
-                    {(formData.type === 'income' ? CATEGORIES.income : CATEGORIES.expense).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
+                    <button 
+                      type="button"
+                      onClick={() => setIsAddingCategory(!isAddingCategory)}
+                      className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider"
+                    >
+                      {isAddingCategory ? 'Cancelar' : '+ Nova Categoria'}
+                    </button>
+                  </div>
+                  
+                  {isAddingCategory ? (
+                    <div className="flex gap-2">
+                      <input
+                        autoFocus
+                        type="text"
+                        placeholder="Nome da categoria"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCategory}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all appearance-none bg-white"
+                    >
+                      {categories
+                        .filter(c => c.type === formData.type)
+                        .map(cat => (
+                          <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        ))}
+                    </select>
+                  )}
                 </div>
 
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <History size={18} className="text-slate-400" />
-                      <span className="text-sm font-semibold text-slate-700">Gasto Recorrente?</span>
+                      <span className="text-sm font-semibold text-slate-700">
+                        {formData.type === 'income' ? 'Receita Recorrente?' : 'Despesa Recorrente?'}
+                      </span>
                     </div>
                     <button
                       type="button"
