@@ -99,8 +99,10 @@ export default function App() {
     setLoading(true);
     try {
       // Check if we are on a static host like Netlify
-      const healthCheck = await fetch('/api/categories').catch(() => ({ ok: false }));
-      if (!healthCheck.ok) {
+      // We use a more robust check for the API
+      const res = await fetch('/api/categories').catch(() => null);
+      
+      if (!res || !res.ok) {
         setIsDemoMode(true);
         const localTransactions = localStorage.getItem('demo_transactions');
         if (localTransactions) setTransactions(JSON.parse(localTransactions));
@@ -110,9 +112,36 @@ export default function App() {
           setCategories(JSON.parse(localCategories));
         }
       } else {
-        await Promise.all([fetchTransactions(), fetchCategories()]);
+        const data = await res.json();
+        const serverCats = Array.isArray(data) ? data : [];
+        
+        const fallbacks: Category[] = [
+          { id: -1, name: 'Salário', type: 'income' },
+          { id: -2, name: 'Investimentos', type: 'income' },
+          { id: -3, name: 'Presente', type: 'income' },
+          { id: -4, name: 'Outros', type: 'income' },
+          { id: -5, name: 'Alimentação', type: 'expense' },
+          { id: -6, name: 'Moradia', type: 'expense' },
+          { id: -7, name: 'Transporte', type: 'expense' },
+          { id: -8, name: 'Lazer', type: 'expense' },
+          { id: -9, name: 'Saúde', type: 'expense' },
+          { id: -10, name: 'Educação', type: 'expense' },
+          { id: -11, name: 'Compras', type: 'expense' },
+          { id: -12, name: 'Outros', type: 'expense' },
+        ];
+
+        const merged = [...serverCats];
+        fallbacks.forEach(fb => {
+          if (!merged.some(m => m.name.toLowerCase() === fb.name.toLowerCase() && m.type === fb.type)) {
+            merged.push(fb);
+          }
+        });
+        
+        setCategories(merged);
+        await fetchTransactions();
       }
     } catch (e) {
+      console.error('Fetch error, entering demo mode:', e);
       setIsDemoMode(true);
     } finally {
       setLoading(false);
@@ -611,19 +640,19 @@ export default function App() {
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-visible"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
             >
-              <div className="p-4 sm:p-6 border-b border-slate-100 shrink-0 bg-white rounded-t-2xl sm:rounded-t-3xl">
+              <div className="p-4 sm:p-6 border-b border-slate-100 shrink-0 bg-white rounded-t-2xl sm:rounded-t-3xl z-50">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900">Nova Transação</h2>
                 <p className="text-xs sm:text-sm text-slate-500">Adicione uma nova entrada ou saída</p>
               </div>
               
               <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-                  <div className="flex p-1 bg-slate-100 rounded-xl">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 pb-40">
+                  <div className="flex p-1 bg-slate-100 rounded-xl shrink-0">
                     <button
                       type="button"
                       onClick={() => {
@@ -746,56 +775,61 @@ export default function App() {
                         
                         <AnimatePresence>
                           {isCategoryDropdownOpen && (
-                            <>
-                              <motion.div 
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 10 }}
-                                className={cn(
-                                  "fixed inset-x-0 bottom-0 z-[100] bg-white rounded-t-3xl shadow-2xl p-4 sm:absolute sm:inset-auto sm:top-full sm:left-0 sm:right-0 sm:bottom-auto sm:mt-2 sm:rounded-xl sm:p-0 sm:max-h-60 sm:overflow-y-auto",
-                                  "max-h-[70vh] overflow-y-auto"
-                                )}
-                              >
-                                <div className="flex items-center justify-between mb-4 sm:hidden">
-                                  <h4 className="font-bold text-slate-900">Selecionar Categoria</h4>
-                                  <button 
-                                    type="button"
-                                    onClick={() => setIsCategoryDropdownOpen(false)}
-                                    className="p-2 bg-slate-100 rounded-full"
-                                  >
-                                    <ChevronDown size={20} />
-                                  </button>
-                                </div>
-                                <div className="space-y-1 sm:space-y-0">
-                                  {categories
-                                    .filter(c => c.type === formData.type)
-                                    .map(cat => (
-                                      <button
-                                        key={cat.id}
-                                        type="button"
-                                        onClick={() => {
-                                          setFormData({ ...formData, category: cat.name });
-                                          setIsCategoryDropdownOpen(false);
-                                        }}
-                                        className={cn(
-                                          "w-full px-4 py-4 sm:py-3 text-left text-base sm:text-sm transition-colors flex items-center justify-between border-b border-slate-50 last:border-0 sm:border-0",
-                                          formData.category === cat.name ? "bg-emerald-50 text-emerald-700 font-semibold" : "hover:bg-slate-50 text-slate-700"
-                                        )}
-                                      >
-                                        {cat.name}
-                                        {formData.category === cat.name && <Check size={18} className="text-emerald-600" />}
-                                      </button>
-                                    ))}
-                                </div>
-                              </motion.div>
-                              <motion.div 
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                onClick={() => setIsCategoryDropdownOpen(false)}
-                                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[90] sm:hidden"
-                              />
-                            </>
+                            <motion.div 
+                              key="category-dropdown"
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className={cn(
+                                "fixed inset-x-0 bottom-0 z-[100] bg-white rounded-t-3xl shadow-2xl p-4 sm:absolute sm:inset-x-0 sm:top-full sm:bottom-auto sm:mt-2 sm:rounded-xl sm:p-0 sm:max-h-60 sm:overflow-y-auto border border-slate-200",
+                                "max-h-[70vh] overflow-y-auto"
+                              )}
+                            >
+                              <div className="flex items-center justify-between mb-4 sm:hidden">
+                                <h4 className="font-bold text-slate-900">Selecionar Categoria</h4>
+                                <button 
+                                  type="button"
+                                  onClick={() => setIsCategoryDropdownOpen(false)}
+                                  className="p-2 bg-slate-100 rounded-full"
+                                >
+                                  <ChevronDown size={20} />
+                                </button>
+                              </div>
+                              <div className="space-y-1 sm:space-y-0">
+                                {categories
+                                  .filter(c => c.type === formData.type)
+                                  .map(cat => (
+                                    <button
+                                      key={cat.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setFormData({ ...formData, category: cat.name });
+                                        setIsCategoryDropdownOpen(false);
+                                      }}
+                                      className={cn(
+                                        "w-full px-4 py-4 sm:py-3 text-left text-base sm:text-sm transition-colors flex items-center justify-between border-b border-slate-50 last:border-0 sm:border-0",
+                                        formData.category === cat.name ? "bg-emerald-50 text-emerald-700 font-semibold" : "hover:bg-slate-50 text-slate-700"
+                                      )}
+                                    >
+                                      {cat.name}
+                                      {formData.category === cat.name && <Check size={18} className="text-emerald-600" />}
+                                    </button>
+                                  ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                        
+                        <AnimatePresence>
+                          {isCategoryDropdownOpen && (
+                            <motion.div 
+                              key="category-backdrop"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              onClick={() => setIsCategoryDropdownOpen(false)}
+                              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[90] sm:hidden"
+                            />
                           )}
                         </AnimatePresence>
                       </div>
