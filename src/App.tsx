@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { 
   Plus, 
   TrendingUp, 
@@ -55,15 +54,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+
   const [transactionToDelete, setTransactionToDelete] = useState<number | null>(null);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [isDemoMode, setIsDemoMode] = useState(false);
   
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const categoryButtonRef = useRef<HTMLButtonElement>(null);
-  const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
+
 
   const [formData, setFormData] = useState<NewTransaction>({
     description: '',
@@ -75,29 +73,7 @@ export default function App() {
     installments: 1,
   });
 
-  // ─── CORREÇÃO: recalcula o rect sempre que o dropdown abre ───
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as HTMLElement;
-      if (isCategoryDropdownOpen && !target.closest('.category-dropdown-container')) {
-        setIsCategoryDropdownOpen(false);
-      }
-    };
 
-    if (isCategoryDropdownOpen) {
-      // Recalcula a posição do botão no momento exato da abertura
-      if (categoryButtonRef.current) {
-        setDropdownRect(categoryButtonRef.current.getBoundingClientRect());
-      }
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [isCategoryDropdownOpen]);
 
   useEffect(() => {
     fetchData();
@@ -743,165 +719,99 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* ─── CATEGORIA - DROPDOWN CORRIGIDO ─── */}
+                  {/* ─── CATEGORIA - SELECT NATIVO (100% compatível com produção) ─── */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</label>
-                      <button 
+                      <button
                         type="button"
-                        onClick={() => {
-                          setIsAddingCategory(!isAddingCategory);
-                          setIsCategoryDropdownOpen(false);
-                        }}
+                        onClick={() => setIsAddingCategory(!isAddingCategory)}
                         className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-1 rounded"
                       >
                         {isAddingCategory ? 'Voltar para lista' : '+ Nova Categoria'}
                       </button>
                     </div>
-                    
+
                     {isAddingCategory ? (
-                      <div className="flex gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div style={{ display: 'flex', gap: '8px' }}>
                         <input
                           autoFocus
                           type="text"
                           placeholder="Nome da nova categoria"
                           value={newCategoryName}
                           onChange={(e) => setNewCategoryName(e.target.value)}
-                          className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all text-base bg-slate-50"
+                          style={{
+                            flex: 1,
+                            padding: '12px 16px',
+                            borderRadius: '12px',
+                            border: '1px solid #e2e8f0',
+                            outline: 'none',
+                            fontSize: '16px',
+                            backgroundColor: '#f8fafc',
+                          }}
                         />
                         <button
                           type="button"
                           onClick={handleAddCategory}
-                          className="px-6 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                          style={{
+                            padding: '12px 24px',
+                            backgroundColor: '#059669',
+                            color: 'white',
+                            borderRadius: '12px',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
                         >
                           Add
                         </button>
                       </div>
                     ) : (
-                      <div className="relative category-dropdown-container">
-                        {/* Botão que abre o dropdown */}
-                        <button
-                          ref={categoryButtonRef}
-                          type="button"
-                          onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                          className="w-full px-4 py-3.5 rounded-xl border border-slate-200 bg-white text-left flex items-center justify-between text-slate-900 text-base min-h-[54px] shadow-sm hover:border-emerald-300 transition-colors"
+                      <div style={{ position: 'relative' }}>
+                        <select
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '14px 44px 14px 16px',
+                            borderRadius: '12px',
+                            border: '1px solid #e2e8f0',
+                            backgroundColor: '#ffffff',
+                            color: '#0f172a',
+                            fontSize: '16px',
+                            fontFamily: 'inherit',
+                            appearance: 'none',
+                            WebkitAppearance: 'none',
+                            MozAppearance: 'none',
+                            outline: 'none',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                          }}
                         >
-                          <span className={formData.category ? "text-slate-900" : "text-slate-400"}>
-                            {formData.category || 'Selecione uma categoria'}
-                          </span>
-                          <ChevronDown
-                            size={20}
-                            className={cn("text-slate-400 transition-transform duration-200", isCategoryDropdownOpen && "rotate-180")}
-                          />
-                        </button>
-
-                        {/* ─── PORTAL: sempre montado, conteúdo controlado pelo AnimatePresence ─── */}
-                        {createPortal(
-                          <AnimatePresence>
-                            {isCategoryDropdownOpen && (
-                              <>
-                                {/* Backdrop escuro (mobile) / transparente (web) para capturar clique fora */}
-                                <motion.div
-                                  key="category-backdrop"
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  onClick={() => setIsCategoryDropdownOpen(false)}
-                                  className="sm:bg-transparent sm:backdrop-blur-none"
-                                  style={{
-                                    position: 'fixed',
-                                    inset: 0,
-                                    zIndex: 9998,
-                                    backgroundColor: typeof window !== 'undefined' && window.innerWidth < 640
-                                      ? 'rgba(15, 23, 42, 0.6)'
-                                      : 'transparent',
-                                  }}
-                                />
-
-                                {/* Dropdown / Bottom Sheet */}
-                                <motion.div
-                                  key="category-dropdown"
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: 10 }}
-                                  style={
-                                    // Web: posiciona logo abaixo do botão usando coordenadas fixed
-                                    typeof window !== 'undefined' && window.innerWidth >= 640 && dropdownRect
-                                      ? {
-                                          position: 'fixed',
-                                          top: dropdownRect.bottom + 8,
-                                          left: dropdownRect.left,
-                                          width: dropdownRect.width,
-                                          zIndex: 9999,
-                                          maxHeight: '240px',
-                                          overflowY: 'auto',
-                                        }
-                                      // Mobile: bottom sheet fixo na base da tela
-                                      : {
-                                          position: 'fixed',
-                                          bottom: 0,
-                                          left: 0,
-                                          right: 0,
-                                          zIndex: 9999,
-                                          maxHeight: '70vh',
-                                          overflowY: 'auto',
-                                        }
-                                  }
-                                  className="bg-white shadow-2xl overflow-hidden rounded-t-3xl sm:rounded-xl sm:border sm:border-slate-200"
-                                >
-                                  {/* Cabeçalho mobile */}
-                                  <div className="p-4 flex items-center justify-between border-b border-slate-100 sm:hidden sticky top-0 bg-white">
-                                    <h4 className="font-bold text-slate-900">Selecionar Categoria</h4>
-                                    <button
-                                      type="button"
-                                      onClick={() => setIsCategoryDropdownOpen(false)}
-                                      className="p-2 bg-slate-100 rounded-full"
-                                    >
-                                      <ChevronDown size={20} />
-                                    </button>
-                                  </div>
-
-                                  {/* Lista de categorias */}
-                                  <div className="p-2 sm:p-1 space-y-0.5">
-                                    {categories
-                                      .filter(c => c.type === formData.type)
-                                      .map(cat => (
-                                        <button
-                                          key={cat.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setFormData({ ...formData, category: cat.name });
-                                            setIsCategoryDropdownOpen(false);
-                                          }}
-                                          className={cn(
-                                            "w-full px-4 py-4 sm:py-2.5 text-left text-base sm:text-sm rounded-xl transition-colors flex items-center justify-between",
-                                            formData.category === cat.name
-                                              ? "bg-emerald-50 text-emerald-700 font-semibold"
-                                              : "hover:bg-slate-50 text-slate-700"
-                                          )}
-                                        >
-                                          {cat.name}
-                                          {formData.category === cat.name && (
-                                            <Check size={18} className="text-emerald-600 shrink-0" />
-                                          )}
-                                        </button>
-                                      ))}
-                                    {categories.filter(c => c.type === formData.type).length === 0 && (
-                                      <div className="p-8 text-center text-slate-400 text-sm italic">
-                                        Nenhuma categoria encontrada
-                                      </div>
-                                    )}
-                                  </div>
-                                </motion.div>
-                              </>
-                            )}
-                          </AnimatePresence>,
-                          document.body
-                        )}
+                          {categories
+                            .filter(c => c.type === formData.type)
+                            .map(cat => (
+                              <option key={cat.id} value={cat.name}>
+                                {cat.name}
+                              </option>
+                            ))}
+                        </select>
+                        {/* Ícone de seta decorativo */}
+                        <div style={{
+                          position: 'absolute',
+                          right: '14px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          pointerEvents: 'none',
+                          color: '#94a3b8',
+                        }}>
+                          <ChevronDown size={20} />
+                        </div>
                       </div>
                     )}
                   </div>
-                  {/* ─── FIM DROPDOWN CATEGORIA ─── */}
+                  {/* ─── FIM CATEGORIA ─── */}
 
                 </div>
 
