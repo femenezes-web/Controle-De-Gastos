@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Plus, 
   TrendingUp, 
@@ -61,6 +62,8 @@ export default function App() {
   
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const categoryButtonRef = useRef<HTMLButtonElement>(null);
+  const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
 
   const [formData, setFormData] = useState<NewTransaction>({
     description: '',
@@ -81,6 +84,9 @@ export default function App() {
     };
 
     if (isCategoryDropdownOpen) {
+      if (categoryButtonRef.current) {
+        setDropdownRect(categoryButtonRef.current.getBoundingClientRect());
+      }
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
     }
@@ -98,50 +104,63 @@ export default function App() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Check if we are on a static host like Netlify
-      // We use a more robust check for the API
+      const fallbacks: Category[] = [
+        { id: -1, name: 'Salário', type: 'income' },
+        { id: -2, name: 'Investimentos', type: 'income' },
+        { id: -3, name: 'Presente', type: 'income' },
+        { id: -4, name: 'Outros', type: 'income' },
+        { id: -5, name: 'Alimentação', type: 'expense' },
+        { id: -6, name: 'Moradia', type: 'expense' },
+        { id: -7, name: 'Transporte', type: 'expense' },
+        { id: -8, name: 'Lazer', type: 'expense' },
+        { id: -9, name: 'Saúde', type: 'expense' },
+        { id: -10, name: 'Educação', type: 'expense' },
+        { id: -11, name: 'Compras', type: 'expense' },
+        { id: -12, name: 'Outros', type: 'expense' },
+      ];
+
+      setCategories(fallbacks); // Set fallbacks immediately as initial state
+
       const res = await fetch('/api/categories').catch(() => null);
       
-      if (!res || !res.ok) {
+      let serverCats: Category[] = [];
+      if (res && res.ok) {
+        const data = await res.json();
+        serverCats = Array.isArray(data) ? data : [];
+      } else {
         setIsDemoMode(true);
         const localTransactions = localStorage.getItem('demo_transactions');
         if (localTransactions) setTransactions(JSON.parse(localTransactions));
         
         const localCategories = localStorage.getItem('demo_categories');
         if (localCategories) {
-          setCategories(JSON.parse(localCategories));
+          serverCats = JSON.parse(localCategories);
         }
-      } else {
-        const data = await res.json();
-        const serverCats = Array.isArray(data) ? data : [];
-        
-        const fallbacks: Category[] = [
-          { id: -1, name: 'Salário', type: 'income' },
-          { id: -2, name: 'Investimentos', type: 'income' },
-          { id: -3, name: 'Presente', type: 'income' },
-          { id: -4, name: 'Outros', type: 'income' },
-          { id: -5, name: 'Alimentação', type: 'expense' },
-          { id: -6, name: 'Moradia', type: 'expense' },
-          { id: -7, name: 'Transporte', type: 'expense' },
-          { id: -8, name: 'Lazer', type: 'expense' },
-          { id: -9, name: 'Saúde', type: 'expense' },
-          { id: -10, name: 'Educação', type: 'expense' },
-          { id: -11, name: 'Compras', type: 'expense' },
-          { id: -12, name: 'Outros', type: 'expense' },
-        ];
+      }
 
-        const merged = [...serverCats];
-        fallbacks.forEach(fb => {
-          if (!merged.some(m => m.name.toLowerCase() === fb.name.toLowerCase() && m.type === fb.type)) {
-            merged.push(fb);
-          }
-        });
-        
-        setCategories(merged);
+      const merged = [...serverCats];
+      fallbacks.forEach(fb => {
+        if (!merged.some(m => m.name.toLowerCase() === fb.name.toLowerCase() && m.type === fb.type)) {
+          merged.push(fb);
+        }
+      });
+      
+      setCategories(merged);
+      
+      // Ensure we have a valid category selected
+      setFormData(prev => {
+        if (!prev.category || !merged.some(c => c.name === prev.category && c.type === prev.type)) {
+          const firstValid = merged.find(c => c.type === prev.type)?.name || 'Outros';
+          return { ...prev, category: firstValid };
+        }
+        return prev;
+      });
+
+      if (res && res.ok) {
         await fetchTransactions();
       }
     } catch (e) {
-      console.error('Fetch error, entering demo mode:', e);
+      console.error('Fetch error:', e);
       setIsDemoMode(true);
     } finally {
       setLoading(false);
@@ -643,7 +662,7 @@ export default function App() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl max-h-[90vh] flex flex-col"
             >
               <div className="p-4 sm:p-6 border-b border-slate-100 shrink-0 bg-white rounded-t-2xl sm:rounded-t-3xl z-50">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900">Nova Transação</h2>
@@ -759,6 +778,7 @@ export default function App() {
                     ) : (
                       <div className="relative category-dropdown-container">
                         <button
+                          ref={categoryButtonRef}
                           type="button"
                           onClick={(e) => {
                             e.preventDefault();
@@ -773,65 +793,89 @@ export default function App() {
                           <ChevronDown size={20} className={cn("text-slate-400 transition-transform", isCategoryDropdownOpen && "rotate-180")} />
                         </button>
                         
-                        <AnimatePresence>
-                          {isCategoryDropdownOpen && (
-                            <motion.div 
-                              key="category-dropdown"
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 10 }}
-                              className={cn(
-                                "fixed inset-x-0 bottom-0 z-[100] bg-white rounded-t-3xl shadow-2xl p-4 sm:absolute sm:inset-x-0 sm:top-full sm:bottom-auto sm:mt-2 sm:rounded-xl sm:p-0 sm:max-h-60 sm:overflow-y-auto border border-slate-200",
-                                "max-h-[70vh] overflow-y-auto"
-                              )}
-                            >
-                              <div className="flex items-center justify-between mb-4 sm:hidden">
-                                <h4 className="font-bold text-slate-900">Selecionar Categoria</h4>
-                                <button 
-                                  type="button"
-                                  onClick={() => setIsCategoryDropdownOpen(false)}
-                                  className="p-2 bg-slate-100 rounded-full"
-                                >
-                                  <ChevronDown size={20} />
-                                </button>
-                              </div>
-                              <div className="space-y-1 sm:space-y-0">
-                                {categories
-                                  .filter(c => c.type === formData.type)
-                                  .map(cat => (
-                                    <button
-                                      key={cat.id}
-                                      type="button"
-                                      onClick={() => {
-                                        setFormData({ ...formData, category: cat.name });
-                                        setIsCategoryDropdownOpen(false);
-                                      }}
-                                      className={cn(
-                                        "w-full px-4 py-4 sm:py-3 text-left text-base sm:text-sm transition-colors flex items-center justify-between border-b border-slate-50 last:border-0 sm:border-0",
-                                        formData.category === cat.name ? "bg-emerald-50 text-emerald-700 font-semibold" : "hover:bg-slate-50 text-slate-700"
+                        {isCategoryDropdownOpen && createPortal(
+                          <div className="fixed inset-0 z-[9999] pointer-events-none">
+                            <AnimatePresence>
+                              {isCategoryDropdownOpen && (
+                                <>
+                                  {/* Mobile Backdrop */}
+                                  <motion.div 
+                                    key="category-backdrop"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setIsCategoryDropdownOpen(false);
+                                    }}
+                                    className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] sm:hidden pointer-events-auto"
+                                  />
+                                  
+                                  {/* Dropdown Content */}
+                                  <motion.div 
+                                    key="category-dropdown"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    style={window.innerWidth >= 640 && dropdownRect ? {
+                                      position: 'absolute',
+                                      top: dropdownRect.bottom + 8,
+                                      left: dropdownRect.left,
+                                      width: dropdownRect.width,
+                                    } : {}}
+                                    className={cn(
+                                      "pointer-events-auto bg-white shadow-2xl overflow-hidden",
+                                      "fixed inset-x-0 bottom-0 z-[101] rounded-t-3xl sm:absolute sm:inset-auto sm:rounded-xl sm:border sm:border-slate-200 sm:z-50",
+                                      "max-h-[70vh] sm:max-h-60 overflow-y-auto"
+                                    )}
+                                  >
+                                    <div className="p-4 flex items-center justify-between border-b border-slate-100 sm:hidden">
+                                      <h4 className="font-bold text-slate-900">Selecionar Categoria</h4>
+                                      <button 
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setIsCategoryDropdownOpen(false);
+                                        }}
+                                        className="p-2 bg-slate-100 rounded-full"
+                                      >
+                                        <ChevronDown size={20} />
+                                      </button>
+                                    </div>
+                                    <div className="p-2 sm:p-1 space-y-1">
+                                      {categories
+                                        .filter(c => c.type === formData.type)
+                                        .map(cat => (
+                                          <button
+                                            key={cat.id}
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setFormData({ ...formData, category: cat.name });
+                                              setIsCategoryDropdownOpen(false);
+                                            }}
+                                            className={cn(
+                                              "w-full px-4 py-4 sm:py-2.5 text-left text-base sm:text-sm rounded-xl transition-colors flex items-center justify-between",
+                                              formData.category === cat.name ? "bg-emerald-50 text-emerald-700 font-semibold" : "hover:bg-slate-50 text-slate-700"
+                                            )}
+                                          >
+                                            {cat.name}
+                                            {formData.category === cat.name && <Check size={18} className="text-emerald-600" />}
+                                          </button>
+                                        ))}
+                                      {categories.filter(c => c.type === formData.type).length === 0 && (
+                                        <div className="p-8 text-center text-slate-400 text-sm italic">
+                                          Nenhuma categoria encontrada
+                                        </div>
                                       )}
-                                    >
-                                      {cat.name}
-                                      {formData.category === cat.name && <Check size={18} className="text-emerald-600" />}
-                                    </button>
-                                  ))}
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                        
-                        <AnimatePresence>
-                          {isCategoryDropdownOpen && (
-                            <motion.div 
-                              key="category-backdrop"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              onClick={() => setIsCategoryDropdownOpen(false)}
-                              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[90] sm:hidden"
-                            />
-                          )}
-                        </AnimatePresence>
+                                    </div>
+                                  </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
+                          </div>,
+                          document.body
+                        )}
                       </div>
                     )}
                   </div>
