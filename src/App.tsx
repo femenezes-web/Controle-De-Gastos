@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Calendar,
-  Tag, ArrowUpRight, ArrowDownRight, PieChart as PieChartIcon, History
+  Tag, ArrowUpRight, ArrowDownRight, PieChart as PieChartIcon, History, Search, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
@@ -111,6 +111,7 @@ export default function App() {
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [formData, setFormData] = useState<NewTransaction>(EMPTY_FORM);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => { fetchData(); }, []);
 
@@ -246,7 +247,9 @@ export default function App() {
   const filteredTransactions = transactions.filter(t => {
     const tDate = parseISO(t.date);
     const start = startOfMonth(parseISO(`${filterMonth}-01`));
-    return isWithinInterval(tDate, { start, end: endOfMonth(start) });
+    const matchesMonth = isWithinInterval(tDate, { start, end: endOfMonth(start) });
+    const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesMonth && matchesSearch;
   });
 
   const totals = filteredTransactions.reduce((acc, t) => {
@@ -273,10 +276,28 @@ export default function App() {
             <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
               <Wallet size={20} />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 truncate">FinTrack</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 truncate hidden min-[400px]:block">FinTrack</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+          <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
+            <div className="flex items-center gap-2 bg-slate-100 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 flex-1 max-w-[120px] sm:max-w-xs transition-all focus-within:max-w-[200px] sm:focus-within:max-w-md">
+              <Search size={15} className="text-slate-500 shrink-0" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-transparent border-none text-sm font-medium focus:ring-0 w-full outline-none min-w-0"
+              />
+              {searchTerm && (
+                <button 
+                  onClick={() => setSearchTerm('')}
+                  className="text-slate-400 hover:text-slate-600 shrink-0"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 bg-slate-100 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 shrink-0">
               <Calendar size={15} className="text-slate-500" />
               <input
                 type="month" value={filterMonth}
