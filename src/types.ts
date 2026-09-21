@@ -1,3 +1,5 @@
+export type FamilyMember = 'Felipe' | 'Karina';
+
 export interface Category {
   id: number;
   name: string;
@@ -11,12 +13,14 @@ export interface Transaction {
   type: 'income' | 'expense';
   category: string;
   date: string;
+  person?: FamilyMember | string;
   is_recurring?: boolean;
   installments?: number;
   created_at?: string;
 }
 
 export type NewTransaction = Omit<Transaction, 'id' | 'created_at'> & {
+  person: FamilyMember;
   isRecurring?: boolean;
   installments?: number;
 };

@@ -18,6 +18,7 @@ db.exec(`
     type TEXT CHECK(type IN ('income', 'expense')) NOT NULL,
     category TEXT NOT NULL,
     date TEXT NOT NULL,
+    person TEXT DEFAULT 'Felipe',
     is_recurring INTEGER DEFAULT 0,
     installments INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -47,7 +48,12 @@ if (categoryCount.count === 0) {
 // Ensure columns exist if table was already created
 try {
   db.exec("ALTER TABLE transactions ADD COLUMN is_recurring INTEGER DEFAULT 0");
+} catch (e) {}
+try {
   db.exec("ALTER TABLE transactions ADD COLUMN installments INTEGER DEFAULT 1");
+} catch (e) {}
+try {
+  db.exec("ALTER TABLE transactions ADD COLUMN person TEXT DEFAULT 'Felipe'");
 } catch (e) {
   // Columns likely already exist
 }
@@ -92,10 +98,10 @@ async function startServer() {
   });
 
   app.post("/api/transactions", (req, res) => {
-    const { description, amount, type, category, date, isRecurring, installments = 1 } = req.body;
+    const { description, amount, type, category, date, isRecurring, installments = 1, person = 'Felipe' } = req.body;
     try {
       const insert = db.prepare(
-        "INSERT INTO transactions (description, amount, type, category, date, is_recurring, installments) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO transactions (description, amount, type, category, date, person, is_recurring, installments) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
       );
 
       if (isRecurring && installments > 1) {
@@ -115,6 +121,7 @@ async function startServer() {
             type,
             category,
             formattedDate,
+            person,
             1,
             installments
           );
@@ -122,7 +129,7 @@ async function startServer() {
         }
         res.json(results[0]);
       } else {
-        const info = insert.run(description, amount, type, category, date, isRecurring ? 1 : 0, installments);
+        const info = insert.run(description, amount, type, category, date, person, isRecurring ? 1 : 0, installments);
         res.json({ id: info.lastInsertRowid });
       }
     } catch (error) {

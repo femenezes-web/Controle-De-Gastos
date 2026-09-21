@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Calendar,
   Tag, ArrowUpRight, ArrowDownRight, PieChart as PieChartIcon, History, Search, X,
-  Smartphone
+  Smartphone, Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Transaction, NewTransaction, Category } from './types';
+import { Transaction, NewTransaction, Category, FamilyMember } from './types';
 import { cn, formatCurrency } from './lib/utils';
 import { MobileAccessModal } from './components/MobileAccessModal';
 
@@ -33,6 +33,7 @@ const EMPTY_FORM: NewTransaction = {
   type: 'expense',
   category: 'Alimentação',
   date: format(new Date(), 'yyyy-MM-dd'),
+  person: 'Felipe',
   isRecurring: false,
   installments: 1,
 };
@@ -109,6 +110,7 @@ export default function App() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<number | null>(null);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [filterPerson, setFilterPerson] = useState<'all' | 'Felipe' | 'Karina'>('all');
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -166,7 +168,13 @@ export default function App() {
 
   const openModal = () => {
     const firstExpense = categories.find(c => c.type === 'expense')?.name || 'Outros';
-    setFormData({ ...EMPTY_FORM, category: firstExpense, date: format(new Date(), 'yyyy-MM-dd') });
+    const defaultPerson: FamilyMember = filterPerson !== 'all' ? filterPerson : 'Felipe';
+    setFormData({ 
+      ...EMPTY_FORM, 
+      category: firstExpense, 
+      person: defaultPerson, 
+      date: format(new Date(), 'yyyy-MM-dd') 
+    });
     setIsAddingCategory(false);
     setNewCategoryName('');
     setIsModalOpen(true);
@@ -253,12 +261,18 @@ export default function App() {
     } catch { setTransactions(orig); }
   };
 
-  const filteredTransactions = transactions.filter(t => {
+  const monthTransactions = transactions.filter(t => {
     const tDate = parseISO(t.date);
     const start = startOfMonth(parseISO(`${filterMonth}-01`));
-    const matchesMonth = isWithinInterval(tDate, { start, end: endOfMonth(start) });
-    const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesMonth && matchesSearch;
+    return isWithinInterval(tDate, { start, end: endOfMonth(start) });
+  });
+
+  const filteredTransactions = monthTransactions.filter(t => {
+    const person = t.person || 'Felipe';
+    const matchesPerson = filterPerson === 'all' || person === filterPerson;
+    const matchesSearch = t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          person.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesPerson && matchesSearch;
   });
 
   const totals = filteredTransactions.reduce((acc, t) => {
@@ -268,6 +282,21 @@ export default function App() {
   }, { income: 0, expense: 0 });
 
   const balance = totals.income - totals.expense;
+
+  const felipeTransactions = monthTransactions.filter(t => (t.person || 'Felipe') === 'Felipe');
+  const karinaTransactions = monthTransactions.filter(t => t.person === 'Karina');
+
+  const felipeTotals = felipeTransactions.reduce((acc, t) => {
+    if (t.type === 'income') acc.income += t.amount;
+    else acc.expense += t.amount;
+    return acc;
+  }, { income: 0, expense: 0 });
+
+  const karinaTotals = karinaTransactions.reduce((acc, t) => {
+    if (t.type === 'income') acc.income += t.amount;
+    else acc.expense += t.amount;
+    return acc;
+  }, { income: 0, expense: 0 });
 
   const chartData = Object.entries(
     filteredTransactions.filter(t => t.type === 'expense')
@@ -335,6 +364,59 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filtro do Casal: Ambos / Felipe / Karina */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
+              <Users size={20} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Controle do Casal</h2>
+              <p className="text-xs text-slate-400">
+                {filterPerson === 'all' 
+                  ? 'Exibindo finanças compartilhadas do casal' 
+                  : `Filtrando apenas lançamentos de ${filterPerson}`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold self-stretch sm:self-auto">
+            <button
+              onClick={() => setFilterPerson('all')}
+              className={cn(
+                "flex-1 sm:flex-none px-3.5 py-2 rounded-lg transition-all cursor-pointer text-center",
+                filterPerson === 'all' 
+                  ? "bg-white text-slate-900 shadow-sm font-bold" 
+                  : "text-slate-500 hover:text-slate-800"
+              )}
+            >
+              Ambos (Casal)
+            </button>
+            <button
+              onClick={() => setFilterPerson('Felipe')}
+              className={cn(
+                "flex-1 sm:flex-none px-3.5 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                filterPerson === 'Felipe' 
+                  ? "bg-blue-600 text-white shadow-sm font-bold" 
+                  : "text-slate-600 hover:text-blue-700"
+              )}
+            >
+              <span>👨</span> Felipe
+            </button>
+            <button
+              onClick={() => setFilterPerson('Karina')}
+              className={cn(
+                "flex-1 sm:flex-none px-3.5 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                filterPerson === 'Karina' 
+                  ? "bg-purple-600 text-white shadow-sm font-bold" 
+                  : "text-slate-600 hover:text-purple-700"
+              )}
+            >
+              <span>👩</span> Karina
+            </button>
+          </div>
+        </div>
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -409,8 +491,19 @@ export default function App() {
                   ? <div className="p-8 text-center text-slate-400 text-sm">Nenhuma transação encontrada.</div>
                   : filteredTransactions.map(t => (
                     <div key={t.id} className="p-4 flex items-center justify-between">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-xs text-slate-400">{format(parseISO(t.date), 'dd MMM', { locale: ptBR })}</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">{format(parseISO(t.date), 'dd MMM', { locale: ptBR })}</span>
+                          <span className={cn(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1",
+                            (t.person || 'Felipe') === 'Karina'
+                              ? "bg-purple-100 text-purple-700 border border-purple-200"
+                              : "bg-blue-100 text-blue-700 border border-blue-200"
+                          )}>
+                            <span>{(t.person || 'Felipe') === 'Karina' ? '👩' : '👨'}</span>
+                            {t.person || 'Felipe'}
+                          </span>
+                        </div>
                         <span className="text-sm font-semibold text-slate-900">{t.description}</span>
                         <span className="text-[11px] text-slate-400 flex items-center gap-1"><Tag size={10} />{t.category}</span>
                       </div>
@@ -433,6 +526,7 @@ export default function App() {
                     <tr className="bg-slate-50">
                       <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Data</th>
                       <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Descrição</th>
+                      <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Responsável</th>
                       <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Categoria</th>
                       <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase text-right">Valor</th>
                       <th className="px-6 py-3 text-xs font-semibold text-slate-500 uppercase text-right">Ações</th>
@@ -440,11 +534,22 @@ export default function App() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredTransactions.length === 0
-                      ? <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400">Nenhuma transação encontrada.</td></tr>
+                      ? <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">Nenhuma transação encontrada.</td></tr>
                       : filteredTransactions.map(t => (
                         <tr key={t.id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4 text-sm text-slate-500">{format(parseISO(t.date), 'dd MMM', { locale: ptBR })}</td>
                           <td className="px-6 py-4 text-sm font-medium text-slate-900">{t.description}</td>
+                          <td className="px-6 py-4">
+                            <span className={cn(
+                              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold",
+                              (t.person || 'Felipe') === 'Karina'
+                                ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                : "bg-blue-50 text-blue-700 border border-blue-200"
+                            )}>
+                              <span>{(t.person || 'Felipe') === 'Karina' ? '👩' : '👨'}</span>
+                              {t.person || 'Felipe'}
+                            </span>
+                          </td>
                           <td className="px-6 py-4">
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
                               <Tag size={11} />{t.category}
@@ -468,6 +573,92 @@ export default function App() {
 
           {/* Side Panel */}
           <div className="space-y-6">
+            {/* Divisão do Casal (Felipe & Karina) */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Users size={18} className="text-slate-600" />
+                  <h2 className="text-base font-bold text-slate-900">Divisão do Casal</h2>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Mês Atual</span>
+              </div>
+
+              <div className="space-y-3">
+                {/* Felipe */}
+                <div 
+                  onClick={() => setFilterPerson(filterPerson === 'Felipe' ? 'all' : 'Felipe')}
+                  className={cn(
+                    "p-3.5 rounded-xl border transition-all cursor-pointer",
+                    filterPerson === 'Felipe' 
+                      ? "bg-blue-50/90 border-blue-300 ring-2 ring-blue-500/20 shadow-sm" 
+                      : "bg-slate-50/70 border-slate-200 hover:border-blue-200 hover:bg-blue-50/40"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">👨</span>
+                      <span className="text-sm font-bold text-slate-900">Felipe</span>
+                    </div>
+                    <span className={cn(
+                      "text-xs font-bold px-2 py-0.5 rounded-md",
+                      (felipeTotals.income - felipeTotals.expense) >= 0 
+                        ? "bg-emerald-100 text-emerald-800" 
+                        : "bg-rose-100 text-rose-800"
+                    )}>
+                      Saldo: {formatCurrency(felipeTotals.income - felipeTotals.expense)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1.5 border-t border-slate-200/60">
+                    <div>
+                      <span className="text-slate-400">Entradas:</span>{' '}
+                      <span className="font-semibold text-emerald-600">+{formatCurrency(felipeTotals.income)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-400">Gastos:</span>{' '}
+                      <span className="font-semibold text-rose-600">-{formatCurrency(felipeTotals.expense)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Karina */}
+                <div 
+                  onClick={() => setFilterPerson(filterPerson === 'Karina' ? 'all' : 'Karina')}
+                  className={cn(
+                    "p-3.5 rounded-xl border transition-all cursor-pointer",
+                    filterPerson === 'Karina' 
+                      ? "bg-purple-50/90 border-purple-300 ring-2 ring-purple-500/20 shadow-sm" 
+                      : "bg-slate-50/70 border-slate-200 hover:border-purple-200 hover:bg-purple-50/40"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">👩</span>
+                      <span className="text-sm font-bold text-slate-900">Karina</span>
+                    </div>
+                    <span className={cn(
+                      "text-xs font-bold px-2 py-0.5 rounded-md",
+                      (karinaTotals.income - karinaTotals.expense) >= 0 
+                        ? "bg-emerald-100 text-emerald-800" 
+                        : "bg-rose-100 text-rose-800"
+                    )}>
+                      Saldo: {formatCurrency(karinaTotals.income - karinaTotals.expense)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1.5 border-t border-slate-200/60">
+                    <div>
+                      <span className="text-slate-400">Entradas:</span>{' '}
+                      <span className="font-semibold text-emerald-600">+{formatCurrency(karinaTotals.income)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-400">Gastos:</span>{' '}
+                      <span className="font-semibold text-rose-600">-{formatCurrency(karinaTotals.expense)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-3 text-center">Clique em Felipe ou Karina para filtrar rapidamente</p>
+            </div>
+
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Destaques do Mês</h2>
               <div className="space-y-3">
@@ -525,6 +716,59 @@ export default function App() {
                   <button type="button" onClick={() => handleTypeChange('income')} style={S.typeBtn(formData.type === 'income', '#059669')}>
                     Receita
                   </button>
+                </div>
+
+                {/* Quem realizou (Felipe ou Karina) */}
+                <div>
+                  <label style={S.label}>Quem realizou esta {formData.type === 'income' ? 'entrada' : 'saída'}?</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, person: 'Felipe' }))}
+                      style={{
+                        padding: '11px 14px',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        border: formData.person === 'Felipe' ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                        backgroundColor: formData.person === 'Felipe' ? '#eff6ff' : '#ffffff',
+                        color: formData.person === 'Felipe' ? '#1d4ed8' : '#64748b',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: formData.person === 'Felipe' ? '0 2px 6px rgba(37,99,235,0.18)' : 'none',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{ fontSize: '18px' }}>👨</span>
+                      <span>Felipe</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, person: 'Karina' }))}
+                      style={{
+                        padding: '11px 14px',
+                        borderRadius: '12px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        border: formData.person === 'Karina' ? '2px solid #db2777' : '1px solid #e2e8f0',
+                        backgroundColor: formData.person === 'Karina' ? '#fdf2f8' : '#ffffff',
+                        color: formData.person === 'Karina' ? '#be185d' : '#64748b',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: formData.person === 'Karina' ? '0 2px 6px rgba(219,39,119,0.18)' : 'none',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{ fontSize: '18px' }}>👩</span>
+                      <span>Karina</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Descrição */}
