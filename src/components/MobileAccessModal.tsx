@@ -127,7 +127,7 @@ export const MobileAccessModal: React.FC<MobileAccessModalProps> = ({ isOpen, on
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold text-emerald-950">Instalação Direta Pronta</h4>
-                  <p className="text-xs text-emerald-700">Instale o FinTrack como aplicativo nativo agora</p>
+                  <p className="text-xs text-emerald-700">Instale o Ricos Também Fazem Conta como aplicativo nativo agora</p>
                 </div>
               </div>
               <button
@@ -142,7 +142,7 @@ export const MobileAccessModal: React.FC<MobileAccessModalProps> = ({ isOpen, on
           {isInstalled && (
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-800 text-xs flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>O FinTrack já está instalado como aplicativo neste aparelho!</span>
+              <span>O app Ricos Também Fazem Conta já está instalado neste aparelho!</span>
             </div>
           )}
 
@@ -153,7 +153,7 @@ export const MobileAccessModal: React.FC<MobileAccessModalProps> = ({ isOpen, on
                 {qrDataUrl ? (
                   <img 
                     src={qrDataUrl} 
-                    alt="QR Code do FinTrack" 
+                    alt="QR Code do app" 
                     className="w-52 h-52 object-contain rounded-lg"
                   />
                 ) : (
@@ -207,7 +207,7 @@ export const MobileAccessModal: React.FC<MobileAccessModalProps> = ({ isOpen, on
                   Acesse pelo Google Chrome
                 </h4>
                 <p className="text-xs text-slate-600 pl-7">
-                  Abra o link do FinTrack no navegador Chrome do seu celular Android.
+                  Abra o link no navegador Chrome do seu celular Android.
                 </p>
 
                 <h4 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
@@ -223,7 +223,7 @@ export const MobileAccessModal: React.FC<MobileAccessModalProps> = ({ isOpen, on
                   Ícone na Tela do Celular
                 </h4>
                 <p className="text-xs text-slate-600 pl-7">
-                  O ícone do <strong>FinTrack</strong> aparecerá na sua tela de aplicativos como um app normal, funcionando em tela cheia e sem barra de navegação do browser!
+                  O ícone do <strong>Ricos Também Fazem Conta</strong> aparecerá na sua tela de aplicativos como um app normal, funcionando em tela cheia e sem barra de navegação do browser!
                 </p>
               </div>
 

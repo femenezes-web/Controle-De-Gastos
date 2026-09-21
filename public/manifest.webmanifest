@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "FinTrack - Controle Financeiro",
-  "short_name": "FinTrack",
-  "description": "Sistema completo para gestão de finanças pessoais, despesas e receitas.",
+  "name": "Ricos Também Fazem Conta",
+  "short_name": "Ricos Fazem Conta",
+  "description": "Sistema completo para gestão de finanças pessoais do casal, despesas e receitas.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

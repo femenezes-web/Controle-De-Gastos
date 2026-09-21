@@ -314,7 +314,7 @@ export default function App() {
             <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
               <Wallet size={20} />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 truncate hidden min-[400px]:block">FinTrack</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 truncate hidden min-[400px]:block">Ricos Também Fazem Conta</h1>
           </div>
           <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
             <div className="flex items-center gap-2 bg-slate-100 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 flex-1 max-w-[120px] sm:max-w-xs transition-all focus-within:max-w-[200px] sm:focus-within:max-w-md">

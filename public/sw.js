@@ -1,5 +1,5 @@
-// FinTrack Service Worker for PWA
-const CACHE_NAME = 'fintrack-v1';
+// Ricos Também Fazem Conta - Service Worker for PWA
+const CACHE_NAME = 'ricos-fazem-conta-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
