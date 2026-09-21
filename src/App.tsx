@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Calendar,
   Tag, ArrowUpRight, ArrowDownRight, PieChart as PieChartIcon, History, Search, X,
-  Smartphone, Users, Camera, UploadCloud, Sparkles, Loader2, CheckCircle2, AlertCircle
+  Users, Camera, UploadCloud, Sparkles, Loader2, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
@@ -10,7 +10,6 @@ import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'da
 import { ptBR } from 'date-fns/locale';
 import { Transaction, NewTransaction, Category, FamilyMember, ScannedReceiptData } from './types';
 import { cn, formatCurrency } from './lib/utils';
-import { MobileAccessModal } from './components/MobileAccessModal';
 
 const DEFAULT_CATEGORIES: Category[] = [
   { id: -1, name: 'Salário', type: 'income' },
@@ -117,7 +116,6 @@ export default function App() {
   const [formData, setFormData] = useState<NewTransaction>(EMPTY_FORM);
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanFeedback, setScanFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [scannedReceiptPreview, setScannedReceiptPreview] = useState<string | null>(null);
@@ -434,70 +432,130 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f8f9fa] pb-12">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
-              <Wallet size={20} />
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Main Top Bar */}
+          <div className="h-16 flex items-center justify-between gap-3">
+            {/* Title & Brand - ALWAYS prominently visible on both mobile and desktop */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-emerald-100 shrink-0">
+                <Wallet size={20} />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <h1 className="text-base sm:text-lg lg:text-xl font-bold tracking-tight text-slate-900 truncate leading-snug">
+                  Ricos Também Fazem Conta
+                </h1>
+                <span className="text-[10px] sm:text-xs text-slate-400 font-medium hidden sm:block">
+                  Controle Financeiro do Casal
+                </span>
+              </div>
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 truncate hidden min-[400px]:block">Ricos Também Fazem Conta</h1>
+
+            {/* Desktop Actions (md and up) */}
+            <div className="hidden md:flex items-center gap-2.5">
+              <div className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-xl border border-slate-200 w-48 lg:w-60 focus-within:w-72 focus-within:border-emerald-500 transition-all">
+                <Search size={15} className="text-slate-400 shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Buscar lançamentos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-transparent border-none text-sm font-medium focus:ring-0 w-full outline-none text-slate-800 placeholder:text-slate-400"
+                />
+                {searchTerm && (
+                  <button 
+                    onClick={() => setSearchTerm('')}
+                    className="text-slate-400 hover:text-slate-600 shrink-0"
+                    title="Limpar busca"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-xl border border-slate-200">
+                <Calendar size={15} className="text-slate-500 shrink-0" />
+                <input
+                  type="month"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className="bg-transparent border-none text-sm font-semibold text-slate-700 focus:ring-0 cursor-pointer outline-none"
+                />
+              </div>
+
+              <button
+                onClick={openModal}
+                className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3.5 py-2 rounded-xl text-sm font-semibold transition shadow-xs cursor-pointer active:scale-98"
+                title="Preencher dados por foto de comprovante ou nota fiscal"
+              >
+                <Camera size={16} className="text-blue-600 shrink-0" />
+                <span>Escanear Nota</span>
+              </button>
+
+              <button
+                onClick={openModal}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center gap-1.5 transition shadow-sm font-semibold text-sm cursor-pointer active:scale-98"
+              >
+                <Plus size={18} />
+                <span>Nova Transação</span>
+              </button>
+            </div>
+
+            {/* Mobile Header Top Buttons (< md) */}
+            <div className="flex md:hidden items-center gap-2 shrink-0">
+              <button
+                onClick={openModal}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs active:scale-95 transition"
+              >
+                <Plus size={15} />
+                <span>Nova</span>
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-1 justify-end min-w-0">
-            <div className="flex items-center gap-2 bg-slate-100 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 flex-1 max-w-[120px] sm:max-w-xs transition-all focus-within:max-w-[200px] sm:focus-within:max-w-md">
-              <Search size={15} className="text-slate-500 shrink-0" />
+
+          {/* Mobile Filter & Search Sub-Bar (< md) */}
+          <div className="md:hidden pb-3 pt-1 flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-200 flex-1 min-w-0">
+              <Search size={14} className="text-slate-400 shrink-0" />
               <input
                 type="text"
                 placeholder="Buscar..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-transparent border-none text-sm font-medium focus:ring-0 w-full outline-none min-w-0"
+                className="bg-transparent border-none text-xs font-medium focus:ring-0 w-full outline-none text-slate-800 placeholder:text-slate-400 min-w-0"
               />
               {searchTerm && (
                 <button 
                   onClick={() => setSearchTerm('')}
                   className="text-slate-400 hover:text-slate-600 shrink-0"
                 >
-                  <X size={14} />
+                  <X size={12} />
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-2 bg-slate-100 px-2 sm:px-3 py-1.5 rounded-lg border border-slate-200 shrink-0">
-              <Calendar size={15} className="text-slate-500" />
+
+            <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1.5 rounded-xl border border-slate-200 shrink-0">
+              <Calendar size={13} className="text-slate-500 shrink-0" />
               <input
-                type="month" value={filterMonth}
+                type="month"
+                value={filterMonth}
                 onChange={(e) => setFilterMonth(e.target.value)}
-                className="bg-transparent border-none text-sm font-medium focus:ring-0 cursor-pointer"
+                className="bg-transparent border-none text-xs font-semibold text-slate-700 focus:ring-0 cursor-pointer outline-none w-28"
               />
             </div>
-            <button
-              onClick={() => setIsMobileModalOpen(true)}
-              className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 shadow-sm cursor-pointer"
-              title="Usar e Instalar no Celular"
-            >
-              <Smartphone size={16} className="text-emerald-700 shrink-0" />
-              <span className="hidden md:inline">Usar no Celular</span>
-              <span className="md:hidden">Celular</span>
-            </button>
+
             <button
               onClick={openModal}
-              className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 shadow-sm cursor-pointer"
-              title="Preencher dados por foto de nota fiscal ou comprovante com IA"
+              className="p-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 shrink-0 active:scale-95 transition"
+              title="Escanear Nota com IA"
             >
-              <Camera size={16} className="text-blue-600 shrink-0" />
-              <span className="hidden sm:inline">Escanear Nota</span>
-            </button>
-            <button
-              onClick={openModal}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all shadow-md cursor-pointer"
-            >
-              <Plus size={18} />
-              <span className="hidden sm:inline font-semibold">Nova Transação</span>
+              <Camera size={15} />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 pb-28 md:pb-12">
         {/* Filtro do Casal: Ambos / Felipe / Karina */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3">
@@ -552,32 +610,32 @@ export default function App() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><TrendingUp size={22} /></div>
-              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Entradas</span>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 mb-6 sm:mb-8">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><TrendingUp size={20} /></div>
+              <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Entradas</span>
             </div>
-            <p className="text-sm text-slate-500 font-medium">Total Recebido</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(totals.income)}</h3>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">Total Recebido</p>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1">{formatCurrency(totals.income)}</h3>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 bg-rose-50 text-rose-600 rounded-lg"><TrendingDown size={22} /></div>
-              <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-1 rounded-full">Saídas</span>
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="p-2 bg-rose-50 text-rose-600 rounded-lg"><TrendingDown size={20} /></div>
+              <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">Saídas</span>
             </div>
-            <p className="text-sm text-slate-500 font-medium">Total Gasto</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">{formatCurrency(totals.expense)}</h3>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">Total Gasto</p>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1">{formatCurrency(totals.expense)}</h3>
           </div>
 
-          <div className={cn("p-5 rounded-2xl border shadow-sm", balance >= 0 ? "bg-emerald-600 border-emerald-500" : "bg-rose-600 border-rose-500")}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 bg-white/20 rounded-lg text-white"><Wallet size={22} /></div>
-              <span className="text-xs font-semibold bg-white/20 text-white px-2 py-1 rounded-full">Saldo</span>
+          <div className={cn("p-4 sm:p-5 rounded-2xl border shadow-sm", balance >= 0 ? "bg-emerald-600 border-emerald-500" : "bg-rose-600 border-rose-500")}>
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <div className="p-2 bg-white/20 rounded-lg text-white"><Wallet size={20} /></div>
+              <span className="text-xs font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">Saldo</span>
             </div>
-            <p className="text-sm text-white/80 font-medium">Disponível</p>
-            <h3 className="text-2xl font-bold text-white mt-1">{formatCurrency(balance)}</h3>
+            <p className="text-xs sm:text-sm text-white/80 font-medium">Disponível</p>
+            <h3 className="text-xl sm:text-2xl font-bold text-white mt-0.5 sm:mt-1">{formatCurrency(balance)}</h3>
           </div>
         </div>
 
@@ -1281,27 +1339,22 @@ export default function App() {
       )}
 
       {/* Mobile Bottom Navigation Bar for quick access */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-2.5 flex items-center justify-between gap-3 shadow-lg pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-2.5 flex items-center justify-between gap-3 shadow-lg pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
         <button
-          onClick={() => setIsMobileModalOpen(true)}
-          className="flex-1 py-2.5 px-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition"
+          onClick={openModal}
+          className="flex-1 py-2.5 px-3 rounded-xl border border-blue-200 bg-blue-50 text-blue-800 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition shadow-xs"
         >
-          <Smartphone size={15} />
-          Usar no Celular
+          <Camera size={16} className="text-blue-600 shrink-0" />
+          <span>Escanear Nota (IA)</span>
         </button>
         <button
           onClick={openModal}
           className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 active:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition"
         >
-          <Plus size={16} />
-          Nova Transação
+          <Plus size={16} className="shrink-0" />
+          <span>Nova Transação</span>
         </button>
       </div>
-
-      <MobileAccessModal 
-        isOpen={isMobileModalOpen} 
-        onClose={() => setIsMobileModalOpen(false)} 
-      />
     </div>
   );
 }
