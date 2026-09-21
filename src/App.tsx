@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Calendar,
-  Tag, ArrowUpRight, ArrowDownRight, PieChart as PieChartIcon, History, Search, X
+  Tag, ArrowUpRight, ArrowDownRight, PieChart as PieChartIcon, History, Search, X,
+  Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
@@ -9,6 +10,7 @@ import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'da
 import { ptBR } from 'date-fns/locale';
 import { Transaction, NewTransaction, Category } from './types';
 import { cn, formatCurrency } from './lib/utils';
+import { MobileAccessModal } from './components/MobileAccessModal';
 
 const DEFAULT_CATEGORIES: Category[] = [
   { id: -1, name: 'Salário', type: 'income' },
@@ -112,6 +114,13 @@ export default function App() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [formData, setFormData] = useState<NewTransaction>(EMPTY_FORM);
   const [searchTerm, setSearchTerm] = useState('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+
+  const showErrorToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
 
   useEffect(() => { fetchData(); }, []);
 
@@ -218,7 +227,7 @@ export default function App() {
         body: JSON.stringify(formData),
       });
       if (res.ok) { fetchTransactions(); }
-      else { alert('Erro ao salvar transação'); setIsModalOpen(true); }
+      else { showErrorToast('Erro ao salvar transação'); setIsModalOpen(true); }
     } catch { setIsModalOpen(true); }
   };
 
@@ -240,7 +249,7 @@ export default function App() {
     }
     try {
       const res = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
-      if (!res.ok) { setTransactions(orig); alert('Erro ao excluir.'); }
+      if (!res.ok) { setTransactions(orig); showErrorToast('Erro ao excluir transação.'); }
     } catch { setTransactions(orig); }
   };
 
@@ -306,8 +315,17 @@ export default function App() {
               />
             </div>
             <button
+              onClick={() => setIsMobileModalOpen(true)}
+              className="flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 shadow-sm cursor-pointer"
+              title="Usar e Instalar no Celular"
+            >
+              <Smartphone size={16} className="text-emerald-700 shrink-0" />
+              <span className="hidden md:inline">Usar no Celular</span>
+              <span className="md:hidden">Celular</span>
+            </button>
+            <button
               onClick={openModal}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all shadow-md"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all shadow-md cursor-pointer"
             >
               <Plus size={18} />
               <span className="hidden sm:inline font-semibold">Nova Transação</span>
@@ -673,6 +691,37 @@ export default function App() {
           </div>
         </div>
       )}
+      {toastMessage && (
+        <div className="fixed bottom-4 right-4 z-50 bg-rose-600 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm font-medium animate-fade-in">
+          <span>{toastMessage}</span>
+          <button onClick={() => setToastMessage(null)} className="text-white/80 hover:text-white ml-2">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Bottom Navigation Bar for quick access */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-2.5 flex items-center justify-between gap-3 shadow-lg pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
+        <button
+          onClick={() => setIsMobileModalOpen(true)}
+          className="flex-1 py-2.5 px-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition"
+        >
+          <Smartphone size={15} />
+          Usar no Celular
+        </button>
+        <button
+          onClick={openModal}
+          className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 active:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition"
+        >
+          <Plus size={16} />
+          Nova Transação
+        </button>
+      </div>
+
+      <MobileAccessModal 
+        isOpen={isMobileModalOpen} 
+        onClose={() => setIsMobileModalOpen(false)} 
+      />
     </div>
   );
 }

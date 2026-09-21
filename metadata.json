@@ -1,5 +1,6 @@
 {
   "name": "FinTrack - Controle Financeiro Pessoal",
-  "description": "Um sistema completo e detalhado para gestão de finanças pessoais, com gráficos, categorias e histórico de transações.",
-  "requestFramePermissions": []
+  "description": "Sistema completo para gestão de finanças pessoais, com gráficos, categorias, histórico e suporte PWA para uso em celulares Android e iOS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="finGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.05" />
+    </linearGradient>
+  </defs>
+  <!-- Background with subtle corner radius -->
+  <rect width="512" height="512" rx="112" fill="url(#finGrad)" />
+  <!-- Card element -->
+  <rect x="76" y="116" width="360" height="230" rx="28" fill="url(#cardGrad)" stroke="#ffffff" stroke-width="6" stroke-opacity="0.4" />
+  <!-- Card chip -->
+  <rect x="116" y="156" width="56" height="42" rx="8" fill="#fef08a" opacity="0.9" />
+  <!-- Wallet / Trend Chart Lines -->
+  <path d="M120 280 L200 230 L270 260 L370 170" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="330 170 370 170 370 210" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Currency symbol badge -->
+  <circle cx="370" cy="360" r="54" fill="#ffffff" />
+  <text x="370" y="380" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="58" font-weight="900" fill="#059669" text-anchor="middle">$</text>
+</svg>
