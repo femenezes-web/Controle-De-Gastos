@@ -24,3 +24,11 @@ export type NewTransaction = Omit<Transaction, 'id' | 'created_at'> & {
   isRecurring?: boolean;
   installments?: number;
 };
+
+export interface ScannedReceiptData {
+  estabelecimento: string;
+  data: string;
+  valor: number;
+  categoria: string;
+  tipo: 'SAIDA' | 'ENTRADA';
+}

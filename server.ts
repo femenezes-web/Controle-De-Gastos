@@ -3,6 +3,7 @@ import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,7 +63,105 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: "25mb" }));
+  app.use(express.urlencoded({ limit: "25mb", extended: true }));
+
+  // API Route: Reconhecimento de Notas Fiscais e Comprovantes via Gemini
+  app.post("/api/scan-receipt", async (req, res) => {
+    const { imageBase64, mimeType = "image/jpeg" } = req.body;
+    if (!imageBase64) {
+      return res.status(400).json({ error: "Nenhuma imagem fornecida para leitura." });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        error: "Chave GEMINI_API_KEY não configurada. Verifique as configurações do projeto.",
+      });
+    }
+
+    try {
+      const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "");
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build",
+          },
+        },
+      });
+
+      const prompt = `Analise detalhadamente a foto desta nota fiscal, cupom fiscal, fatura ou recibo de pagamento/PIX.
+Extraia os dados da transação com o máximo de precisão possível:
+1. "estabelecimento": Nome da loja, supermercado, restaurante, prestador de serviço ou empresa beneficiária. Se não encontrar o nome fantasia, procure a razão social ou nome do favorecido.
+2. "data": Data da compra ou emissão no formato ISO 'YYYY-MM-DD'. Se o ano não constar expressamente, use o ano corrente (${new Date().getFullYear()}).
+3. "valor": Valor total final líquido da compra ou pagamento, expresso como número decimal (exemplo: 89.90 ou 1500.00). Não adicione símbolo de moeda.
+4. "categoria": Categoria sugerida mais apropriada para a transação. Escolha entre: "Alimentação", "Supermercado", "Transporte", "Moradia", "Saúde", "Lazer", "Educação", "Compras", "Investimentos", "Salário" ou "Outros".
+5. "tipo": Classifique como "SAIDA" para despesas, pagamentos, compras no débito/crédito, ou como "ENTRADA" para comprovantes de depósito, recebimento ou salário.
+
+Retorne estritamente o JSON com esses campos.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: [
+          {
+            inlineData: {
+              mimeType: mimeType || "image/jpeg",
+              data: cleanBase64,
+            },
+          },
+          {
+            text: prompt,
+          },
+        ],
+        config: {
+          systemInstruction:
+            "Você é um especialista em OCR e auditoria contábil focado na extração automatizada de dados de comprovantes e notas fiscais brasileiras.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              estabelecimento: {
+                type: Type.STRING,
+                description: "Nome da loja ou fornecedor",
+              },
+              data: {
+                type: Type.STRING,
+                description: "Data da compra no formato YYYY-MM-DD",
+              },
+              valor: {
+                type: Type.NUMBER,
+                description: "Valor total como número decimal",
+              },
+              categoria: {
+                type: Type.STRING,
+                description: "Categoria sugerida (ex: Supermercado, Transporte, Alimentação, Saúde, Lazer, Outros)",
+              },
+              tipo: {
+                type: Type.STRING,
+                enum: ["SAIDA", "ENTRADA"],
+                description: "'SAIDA' ou 'ENTRADA'",
+              },
+            },
+            required: ["estabelecimento", "data", "valor", "categoria", "tipo"],
+          },
+        },
+      });
+
+      const responseText = response.text?.trim();
+      if (!responseText) {
+        return res.status(500).json({ error: "O modelo não conseguiu extrair dados do comprovante." });
+      }
+
+      const extractedData = JSON.parse(responseText);
+      res.json(extractedData);
+    } catch (error: any) {
+      console.error("Erro na leitura do comprovante via Gemini:", error);
+      res.status(500).json({
+        error: error?.message || "Não foi possível analisar a imagem da nota fiscal.",
+      });
+    }
+  });
 
   // API Routes
   app.get("/api/categories", (req, res) => {

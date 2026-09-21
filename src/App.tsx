@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   Plus, TrendingUp, TrendingDown, Wallet, Trash2, Calendar,
   Tag, ArrowUpRight, ArrowDownRight, PieChart as PieChartIcon, History, Search, X,
-  Smartphone, Users
+  Smartphone, Users, Camera, UploadCloud, Sparkles, Loader2, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Transaction, NewTransaction, Category, FamilyMember } from './types';
+import { Transaction, NewTransaction, Category, FamilyMember, ScannedReceiptData } from './types';
 import { cn, formatCurrency } from './lib/utils';
 import { MobileAccessModal } from './components/MobileAccessModal';
 
@@ -118,6 +118,9 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [scannedReceiptPreview, setScannedReceiptPreview] = useState<string | null>(null);
 
   const showErrorToast = (msg: string) => {
     setToastMessage(msg);
@@ -177,7 +180,130 @@ export default function App() {
     });
     setIsAddingCategory(false);
     setNewCategoryName('');
+    setIsScanning(false);
+    setScanFeedback(null);
+    setScannedReceiptPreview(null);
     setIsModalOpen(true);
+  };
+
+  const handleReceiptFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    event.target.value = '';
+
+    if (!file.type.startsWith('image/')) {
+      setScanFeedback({
+        type: 'error',
+        message: 'Por favor, selecione um arquivo de imagem (JPG, PNG, WebP).',
+      });
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      setScanFeedback({
+        type: 'error',
+        message: 'A imagem é muito grande (máximo 20MB). Tente uma foto menor.',
+      });
+      return;
+    }
+
+    setIsScanning(true);
+    setScanFeedback(null);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Url = reader.result as string;
+      setScannedReceiptPreview(base64Url);
+
+      try {
+        const res = await fetch('/api/scan-receipt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64Url,
+            mimeType: file.type || 'image/jpeg',
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Erro ao processar imagem da nota fiscal.');
+        }
+
+        const data: ScannedReceiptData = await res.json();
+        const targetType: 'income' | 'expense' = data.tipo === 'ENTRADA' ? 'income' : 'expense';
+
+        let targetDate = format(new Date(), 'yyyy-MM-dd');
+        if (data.data && /^\d{4}-\d{2}-\d{2}$/.test(data.data)) {
+          targetDate = data.data;
+        }
+
+        let targetAmount = 0;
+        if (typeof data.valor === 'number' && !isNaN(data.valor) && data.valor > 0) {
+          targetAmount = Math.round(data.valor * 100) / 100;
+        }
+
+        let suggestedCat = (data.categoria || '').trim();
+        if (!suggestedCat) {
+          suggestedCat = targetType === 'income' ? 'Outros' : 'Alimentação';
+        }
+
+        const existingCat = categories.find(
+          c => c.type === targetType && c.name.toLowerCase() === suggestedCat.toLowerCase()
+        );
+
+        let finalCategory = existingCat ? existingCat.name : suggestedCat;
+
+        if (!existingCat && suggestedCat) {
+          const newCatItem: Category = {
+            id: Date.now(),
+            name: suggestedCat,
+            type: targetType,
+          };
+          setCategories(prev => [...prev, newCatItem]);
+          if (!isDemoMode) {
+            fetch('/api/categories', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: suggestedCat, type: targetType }),
+            }).catch(() => {});
+          }
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          type: targetType,
+          description: data.estabelecimento || prev.description || 'Comprovante / Recibo',
+          amount: targetAmount,
+          date: targetDate,
+          category: finalCategory,
+        }));
+
+        setScanFeedback({
+          type: 'success',
+          message: `Dados extraídos com sucesso! ${data.estabelecimento ? `Estabelecimento: ${data.estabelecimento} • ` : ''}Valor: R$ ${targetAmount.toFixed(2).replace('.', ',')}`,
+        });
+      } catch (err: any) {
+        console.error('Scan error:', err);
+        setScanFeedback({
+          type: 'error',
+          message: err.message || 'Não foi possível ler a nota fiscal. Verifique a foto e tente novamente.',
+        });
+      } finally {
+        setIsScanning(false);
+      }
+    };
+
+    reader.onerror = () => {
+      setIsScanning(false);
+      setScanFeedback({
+        type: 'error',
+        message: 'Erro ao ler o arquivo de imagem.',
+      });
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const handleTypeChange = (type: 'income' | 'expense') => {
@@ -351,6 +477,14 @@ export default function App() {
               <Smartphone size={16} className="text-emerald-700 shrink-0" />
               <span className="hidden md:inline">Usar no Celular</span>
               <span className="md:hidden">Celular</span>
+            </button>
+            <button
+              onClick={openModal}
+              className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 shadow-sm cursor-pointer"
+              title="Preencher dados por foto de nota fiscal ou comprovante com IA"
+            >
+              <Camera size={16} className="text-blue-600 shrink-0" />
+              <span className="hidden sm:inline">Escanear Nota</span>
             </button>
             <button
               onClick={openModal}
@@ -708,6 +842,205 @@ export default function App() {
             <form onSubmit={handleSubmit} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div style={S.modalBody}>
 
+                {/* ─── RECONHECIMENTO AUTOMÁTICO DE NOTA FISCAL / RECIBO VIA IA ─── */}
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1.5px dashed #cbd5e1',
+                  borderRadius: '16px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '10px',
+                        backgroundColor: '#ecfdf5',
+                        color: '#059669',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Sparkles size={18} />
+                      </div>
+                      <div>
+                        <span style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                          Preencher com Foto de Comprovante
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#64748b' }}>
+                          IA analisa nota, cupom fiscal ou PIX automaticamente
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Botões de Ação: Câmera ou Arquivo */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '10px 12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#1e293b',
+                      cursor: isScanning ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                      opacity: isScanning ? 0.6 : 1,
+                      userSelect: 'none',
+                    }}>
+                      <Camera size={16} color="#059669" />
+                      <span>Tirar Foto</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        disabled={isScanning}
+                        onChange={handleReceiptFileChange}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '10px 12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: '#1e293b',
+                      cursor: isScanning ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                      opacity: isScanning ? 0.6 : 1,
+                      userSelect: 'none',
+                    }}>
+                      <UploadCloud size={16} color="#2563eb" />
+                      <span>Galeria / Arquivo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isScanning}
+                        onChange={handleReceiptFileChange}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Indicador de Carregamento (Loading) */}
+                  {isScanning && (
+                    <div style={{
+                      backgroundColor: '#eff6ff',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '10px',
+                      padding: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      color: '#1d4ed8',
+                      fontSize: '12px',
+                    }}>
+                      <Loader2 size={18} className="animate-spin shrink-0 text-blue-600" />
+                      <div>
+                        <strong style={{ display: 'block', fontSize: '12px', color: '#1e40af' }}>
+                          Analisando comprovante com IA...
+                        </strong>
+                        <span style={{ fontSize: '11px', color: '#3b82f6' }}>
+                          Extraindo estabelecimento, valor total, data e sugerindo categoria.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mensagem de Feedback (Sucesso ou Erro) */}
+                  {scanFeedback && !isScanning && (
+                    <div style={{
+                      backgroundColor: scanFeedback.type === 'success' ? '#ecfdf5' : '#fff1f2',
+                      border: `1px solid ${scanFeedback.type === 'success' ? '#a7f3d0' : '#fecdd3'}`,
+                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                      fontSize: '12px',
+                      color: scanFeedback.type === 'success' ? '#065f46' : '#9f1239',
+                    }}>
+                      {scanFeedback.type === 'success' ? (
+                        <CheckCircle2 size={16} color="#059669" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      ) : (
+                        <AlertCircle size={16} color="#e11d48" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      )}
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontWeight: 600 }}>{scanFeedback.message}</p>
+                        {scanFeedback.type === 'success' && (
+                          <p style={{ margin: '3px 0 0', fontSize: '11px', color: '#047857' }}>
+                            Campos preenchidos abaixo. Você pode editá-los livremente antes de salvar.
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setScanFeedback(null)}
+                        style={{
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          color: 'inherit',
+                          padding: '2px',
+                          opacity: 0.6,
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Miniatura do Comprovante Anexado */}
+                  {scannedReceiptPreview && !isScanning && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '2px' }}>
+                      <img
+                        src={scannedReceiptPreview}
+                        alt="Comprovante"
+                        style={{
+                          width: '42px',
+                          height: '42px',
+                          objectFit: 'cover',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                        }}
+                      />
+                      <div style={{ flex: 1, fontSize: '11px', color: '#64748b' }}>
+                        <span>Foto do comprovante anexada para conferência.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setScannedReceiptPreview(null)}
+                        style={{
+                          fontSize: '11px',
+                          color: '#94a3b8',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        Remover foto
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Tipo Despesa / Receita */}
                 <div style={{ display: 'flex', gap: '4px', padding: '4px', backgroundColor: '#f1f5f9', borderRadius: '14px' }}>
                   <button type="button" onClick={() => handleTypeChange('expense')} style={S.typeBtn(formData.type === 'expense', '#e11d48')}>
@@ -847,6 +1180,9 @@ export default function App() {
                             <option key={cat.id} value={cat.name}>{cat.name}</option>
                           ))
                       }
+                      {formData.category && !filteredCategories.some(cat => cat.name === formData.category) && (
+                        <option value={formData.category}>{formData.category}</option>
+                      )}
                     </select>
                   )}
                 </div>
