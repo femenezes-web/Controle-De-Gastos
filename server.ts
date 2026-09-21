@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
@@ -66,17 +67,17 @@ async function startServer() {
   app.use(express.json({ limit: "25mb" }));
   app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
-  // API Route: Reconhecimento de Notas Fiscais e Comprovantes via Gemini
+  // API Route: Reconhecimento Inteligente de Pedidos, Notas Fiscais e Comprovantes via Gemini
   app.post("/api/scan-receipt", async (req, res) => {
     const { imageBase64, mimeType = "image/jpeg" } = req.body;
     if (!imageBase64) {
       return res.status(400).json({ error: "Nenhuma imagem fornecida para leitura." });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
       return res.status(500).json({
-        error: "Chave GEMINI_API_KEY não configurada. Verifique as configurações do projeto.",
+        error: "Chave GEMINI_API_KEY não configurada. Por favor, adicione sua chave nas configurações (Settings/Secrets) do Google AI Studio para ativar o escaneamento inteligente de notas e pedidos.",
       });
     }
 
@@ -91,66 +92,123 @@ async function startServer() {
         },
       });
 
-      const prompt = `Analise detalhadamente a foto desta nota fiscal, cupom fiscal, fatura ou recibo de pagamento/PIX.
-Extraia os dados da transação com o máximo de precisão possível:
-1. "estabelecimento": Nome da loja, supermercado, restaurante, prestador de serviço ou empresa beneficiária. Se não encontrar o nome fantasia, procure a razão social ou nome do favorecido.
-2. "data": Data da compra ou emissão no formato ISO 'YYYY-MM-DD'. Se o ano não constar expressamente, use o ano corrente (${new Date().getFullYear()}).
-3. "valor": Valor total final líquido da compra ou pagamento, expresso como número decimal (exemplo: 89.90 ou 1500.00). Não adicione símbolo de moeda.
-4. "categoria": Categoria sugerida mais apropriada para a transação. Escolha entre: "Alimentação", "Supermercado", "Transporte", "Moradia", "Saúde", "Lazer", "Educação", "Compras", "Investimentos", "Salário" ou "Outros".
-5. "tipo": Classifique como "SAIDA" para despesas, pagamentos, compras no débito/crédito, ou como "ENTRADA" para comprovantes de depósito, recebimento ou salário.
+      const currentYear = new Date().getFullYear();
+      const prompt = `Você é um auditor financeiro e especialista em visão computacional focado em notas fiscais, cupons, faturas, recibos e PEDIDOS de compras (restaurantes, delivery como iFood, lojas físicas e online).
 
-Retorne estritamente o JSON com esses campos.`;
+Analise atentamente a foto deste pedido ou comprovante e extraia as seguintes informações:
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: [
-          {
-            inlineData: {
-              mimeType: mimeType || "image/jpeg",
-              data: cleanBase64,
-            },
-          },
-          {
-            text: prompt,
-          },
-        ],
-        config: {
-          systemInstruction:
-            "Você é um especialista em OCR e auditoria contábil focado na extração automatizada de dados de comprovantes e notas fiscais brasileiras.",
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              estabelecimento: {
-                type: Type.STRING,
-                description: "Nome da loja ou fornecedor",
-              },
-              data: {
-                type: Type.STRING,
-                description: "Data da compra no formato YYYY-MM-DD",
-              },
-              valor: {
-                type: Type.NUMBER,
-                description: "Valor total como número decimal",
-              },
-              categoria: {
-                type: Type.STRING,
-                description: "Categoria sugerida (ex: Supermercado, Transporte, Alimentação, Saúde, Lazer, Outros)",
-              },
-              tipo: {
-                type: Type.STRING,
-                enum: ["SAIDA", "ENTRADA"],
-                description: "'SAIDA' ou 'ENTRADA'",
-              },
-            },
-            required: ["estabelecimento", "data", "valor", "categoria", "tipo"],
+1. VALOR TOTAL (CRÍTICO):
+   - Localize o valor total final pago ou a pagar da compra (ex: procure por "TOTAL", "TOTAL A PAGAR", "VALOR TOTAL", "TOTAL R$", "VALOR LÍQUIDO", "TOTAL DO PEDIDO", "VALOR PAGO").
+   - Se o documento tiver múltiplos itens e não tiver um campo "TOTAL" explícito, some o valor dos itens para encontrar o total da compra.
+   - Não confunda o valor total com troco, taxas individuais isoladas, descontos parciais ou CNPJ.
+   - Retorne o valor estritamente como número decimal positivo (exemplo: 42.50 ou 189.90).
+
+2. TIPO DE PRODUTO E CATEGORIZAÇÃO:
+   - Identifique com cuidado quais produtos ou serviços foram adquiridos (ex: lanche, refeição, café, pizza, remédio, gasolina, supermercado, eletrônico, roupa, conta).
+   - Com base no TIPO DE PRODUTO analisado, selecione a categoria mais adequada:
+     * "Alimentação": Comidas, lanches, bebidas de consumo imediato, restaurantes, hamburguerias, padarias, cafeterias, delivery (iFood, comanda de restaurante, marmitas).
+     * "Supermercado": Compras de mantimentos para a casa, despensa, hortifrúti, açougue, produtos de limpeza ou higiene pessoal em mercados.
+     * "Transporte": Combustível, gasolina, etanol, corridas de aplicativo (Uber, 99), táxi, pedágio, estacionamento, passagens, mecânica.
+     * "Saúde": Farmácias, medicamentos, remédios, consultas médicas, exames laboratoriais, dentista, ótica.
+     * "Moradia": Contas de consumo doméstico (luz, água, gás, internet), aluguel, condomínio, manutenção ou reparos da casa.
+     * "Compras": Roupas, calçados, eletrônicos, cosméticos, acessórios, itens pessoais em lojas de departamento ou e-commerce.
+     * "Lazer": Cinema, teatro, shows, jogos, viagens, passeios, streaming.
+     * "Educação": Livros, cursos, mensalidades escolares ou universitárias, material didático.
+     * "Outros": Apenas se os produtos não se encaixarem em nenhuma das categorias acima.
+
+3. ESTABELECIMENTO / DESCRIÇÃO:
+   - "estabelecimento": Nome da loja, restaurante, app ou fornecedor (ex: "Cantina da Nonna", "iFood", "Droga Raia", "Posto Shell").
+   - "descricao_formatada": Um resumo limpo e amigável da compra incluindo o local e os principais itens (ex: "Cantina da Nonna - Almoço", "Droga Raia - Medicamentos").
+   - "produtos_identificados": Uma lista breve dos produtos identificados no pedido (ex: ["Hambúrguer Artesanal", "Batata Frita", "Refrigerante"]).
+
+4. DATA DA COMPRA:
+   - No formato ISO 'YYYY-MM-DD'. Se o ano não constar, use o ano corrente (${currentYear}). Se não encontrar data, use a data atual.
+
+5. TIPO:
+   - "SAIDA" para qualquer despesa, pedido ou compra. "ENTRADA" apenas se for comprovante de depósito ou salário.`;
+
+      const contents = [
+        {
+          inlineData: {
+            mimeType: mimeType || "image/jpeg",
+            data: cleanBase64,
           },
         },
-      });
+        {
+          text: prompt,
+        },
+      ];
 
-      const responseText = response.text?.trim();
+      const config = {
+        systemInstruction:
+          "Você é um especialista em OCR e auditoria financeira focado em reconhecimento de pedidos e notas fiscais brasileiras. Sempre extraia o valor total numérico e classifique a categoria com base no tipo exato de produto.",
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            estabelecimento: {
+              type: Type.STRING,
+              description: "Nome da loja, restaurante ou fornecedor",
+            },
+            descricao_formatada: {
+              type: Type.STRING,
+              description: "Título amigável para o lançamento",
+            },
+            produtos_identificados: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Lista de produtos ou itens identificados no pedido",
+            },
+            data: {
+              type: Type.STRING,
+              description: "Data da compra no formato YYYY-MM-DD",
+            },
+            valor: {
+              type: Type.NUMBER,
+              description: "Valor total líquido da compra como número decimal",
+            },
+            categoria: {
+              type: Type.STRING,
+              description: "Categoria selecionada com base no tipo de produto",
+            },
+            tipo: {
+              type: Type.STRING,
+              enum: ["SAIDA", "ENTRADA"],
+              description: "'SAIDA' ou 'ENTRADA'",
+            },
+            motivo_categoria: {
+              type: Type.STRING,
+              description: "Breve explicação do porquê essa categoria foi escolhida",
+            },
+          },
+          required: ["estabelecimento", "descricao_formatada", "data", "valor", "categoria", "tipo"],
+        },
+      };
+
+      // Modelo com fallback resiliente para evitar erros transitórios de alta demanda
+      const modelsToTry = ["gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3.8-flash"];
+      let lastError: any = null;
+      let responseText = "";
+
+      for (const model of modelsToTry) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents,
+            config,
+          });
+          responseText = response.text?.trim() || "";
+          if (responseText) break;
+        } catch (err: any) {
+          console.warn(`Tentativa com modelo ${model} falhou:`, err?.message || err);
+          lastError = err;
+          // Espera breve antes do fallback
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+
       if (!responseText) {
-        return res.status(500).json({ error: "O modelo não conseguiu extrair dados do comprovante." });
+        throw lastError || new Error("O modelo não conseguiu extrair dados do pedido.");
       }
 
       const extractedData = JSON.parse(responseText);

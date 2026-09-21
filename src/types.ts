@@ -27,8 +27,11 @@ export type NewTransaction = Omit<Transaction, 'id' | 'created_at'> & {
 
 export interface ScannedReceiptData {
   estabelecimento: string;
+  descricao_formatada?: string;
+  produtos_identificados?: string[];
   data: string;
   valor: number;
   categoria: string;
   tipo: 'SAIDA' | 'ENTRADA';
+  motivo_categoria?: string;
 }

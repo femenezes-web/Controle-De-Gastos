@@ -184,6 +184,58 @@ export default function App() {
     setIsModalOpen(true);
   };
 
+  // Otimizador de imagem client-side: redimensiona fotos pesadas de celulares (evita travamento e timeout)
+  const optimizeImageForOCR = (file: File): Promise<{ base64: string; mimeType: string }> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (!result) {
+          resolve({ base64: '', mimeType: file.type || 'image/jpeg' });
+          return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const maxDim = 1600;
+            let { width, height } = img;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0, width, height);
+                const optimized = canvas.toDataURL('image/jpeg', 0.88);
+                resolve({ base64: optimized, mimeType: 'image/jpeg' });
+                return;
+              }
+            }
+          } catch (err) {
+            console.warn('Canvas resize fallback:', err);
+          }
+          resolve({ base64: result, mimeType: file.type || 'image/jpeg' });
+        };
+        img.onerror = () => {
+          resolve({ base64: result, mimeType: file.type || 'image/jpeg' });
+        };
+        img.src = result;
+      };
+      reader.onerror = () => {
+        resolve({ base64: '', mimeType: file.type || 'image/jpeg' });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleReceiptFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -193,15 +245,7 @@ export default function App() {
     if (!file.type.startsWith('image/')) {
       setScanFeedback({
         type: 'error',
-        message: 'Por favor, selecione um arquivo de imagem (JPG, PNG, WebP).',
-      });
-      return;
-    }
-
-    if (file.size > 20 * 1024 * 1024) {
-      setScanFeedback({
-        type: 'error',
-        message: 'A imagem é muito grande (máximo 20MB). Tente uma foto menor.',
+        message: 'Por favor, selecione um arquivo de imagem válido (JPG, PNG, WebP).',
       });
       return;
     }
@@ -209,99 +253,103 @@ export default function App() {
     setIsScanning(true);
     setScanFeedback(null);
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64Url = reader.result as string;
+    try {
+      const { base64: base64Url, mimeType } = await optimizeImageForOCR(file);
+      if (!base64Url) {
+        throw new Error('Não foi possível ler a imagem selecionada.');
+      }
       setScannedReceiptPreview(base64Url);
 
-      try {
-        const res = await fetch('/api/scan-receipt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: base64Url,
-            mimeType: file.type || 'image/jpeg',
-          }),
-        });
+      const res = await fetch('/api/scan-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64Url,
+          mimeType,
+        }),
+      });
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || 'Erro ao processar imagem da nota fiscal.');
-        }
-
-        const data: ScannedReceiptData = await res.json();
-        const targetType: 'income' | 'expense' = data.tipo === 'ENTRADA' ? 'income' : 'expense';
-
-        let targetDate = format(new Date(), 'yyyy-MM-dd');
-        if (data.data && /^\d{4}-\d{2}-\d{2}$/.test(data.data)) {
-          targetDate = data.data;
-        }
-
-        let targetAmount = 0;
-        if (typeof data.valor === 'number' && !isNaN(data.valor) && data.valor > 0) {
-          targetAmount = Math.round(data.valor * 100) / 100;
-        }
-
-        let suggestedCat = (data.categoria || '').trim();
-        if (!suggestedCat) {
-          suggestedCat = targetType === 'income' ? 'Outros' : 'Alimentação';
-        }
-
-        const existingCat = categories.find(
-          c => c.type === targetType && c.name.toLowerCase() === suggestedCat.toLowerCase()
-        );
-
-        let finalCategory = existingCat ? existingCat.name : suggestedCat;
-
-        if (!existingCat && suggestedCat) {
-          const newCatItem: Category = {
-            id: Date.now(),
-            name: suggestedCat,
-            type: targetType,
-          };
-          setCategories(prev => [...prev, newCatItem]);
-          if (!isDemoMode) {
-            fetch('/api/categories', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: suggestedCat, type: targetType }),
-            }).catch(() => {});
-          }
-        }
-
-        setFormData(prev => ({
-          ...prev,
-          type: targetType,
-          description: data.estabelecimento || prev.description || 'Comprovante / Recibo',
-          amount: targetAmount,
-          date: targetDate,
-          category: finalCategory,
-        }));
-
-        setScanFeedback({
-          type: 'success',
-          message: `Dados extraídos com sucesso! ${data.estabelecimento ? `Estabelecimento: ${data.estabelecimento} • ` : ''}Valor: R$ ${targetAmount.toFixed(2).replace('.', ',')}`,
-        });
-      } catch (err: any) {
-        console.error('Scan error:', err);
-        setScanFeedback({
-          type: 'error',
-          message: err.message || 'Não foi possível ler a nota fiscal. Verifique a foto e tente novamente.',
-        });
-      } finally {
-        setIsScanning(false);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Erro ao processar imagem do comprovante ou pedido.');
       }
-    };
 
-    reader.onerror = () => {
-      setIsScanning(false);
+      const data: ScannedReceiptData = await res.json();
+      const targetType: 'income' | 'expense' = data.tipo === 'ENTRADA' ? 'income' : 'expense';
+
+      let targetDate = format(new Date(), 'yyyy-MM-dd');
+      if (data.data && /^\d{4}-\d{2}-\d{2}$/.test(data.data)) {
+        targetDate = data.data;
+      }
+
+      let targetAmount = 0;
+      if (typeof data.valor === 'number' && !isNaN(data.valor) && data.valor > 0) {
+        targetAmount = Math.round(data.valor * 100) / 100;
+      }
+
+      let suggestedCat = (data.categoria || '').trim();
+      if (!suggestedCat) {
+        suggestedCat = targetType === 'income' ? 'Outros' : 'Alimentação';
+      }
+
+      const existingCat = categories.find(
+        c => c.type === targetType && c.name.toLowerCase() === suggestedCat.toLowerCase()
+      );
+
+      let finalCategory = existingCat ? existingCat.name : suggestedCat;
+
+      if (!existingCat && suggestedCat) {
+        const newCatItem: Category = {
+          id: Date.now(),
+          name: suggestedCat,
+          type: targetType,
+        };
+        setCategories(prev => [...prev, newCatItem]);
+        if (!isDemoMode) {
+          fetch('/api/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: suggestedCat, type: targetType }),
+          }).catch(() => {});
+        }
+      }
+
+      const computedDescription =
+        data.descricao_formatada ||
+        data.estabelecimento ||
+        (data.produtos_identificados && data.produtos_identificados.length > 0
+          ? data.produtos_identificados.slice(0, 2).join(', ')
+          : 'Pedido / Compra');
+
+      setFormData(prev => ({
+        ...prev,
+        type: targetType,
+        description: computedDescription,
+        amount: targetAmount,
+        date: targetDate,
+        category: finalCategory,
+      }));
+
+      const productsSummary =
+        data.produtos_identificados && data.produtos_identificados.length > 0
+          ? ` • Itens: ${data.produtos_identificados.slice(0, 3).join(', ')}${data.produtos_identificados.length > 3 ? '...' : ''}`
+          : '';
+
+      const reasonSummary = data.motivo_categoria ? ` (${data.motivo_categoria})` : '';
+
+      setScanFeedback({
+        type: 'success',
+        message: `Pedido reconhecido! Valor: R$ ${targetAmount.toFixed(2).replace('.', ',')} • Categoria: ${finalCategory}${reasonSummary}${productsSummary}`,
+      });
+    } catch (err: any) {
+      console.error('Scan error:', err);
       setScanFeedback({
         type: 'error',
-        message: 'Erro ao ler o arquivo de imagem.',
+        message: err.message || 'Não foi possível analisar a imagem do pedido. Verifique a foto e tente novamente.',
       });
-    };
-
-    reader.readAsDataURL(file);
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const handleTypeChange = (type: 'income' | 'expense') => {
