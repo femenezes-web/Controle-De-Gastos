@@ -74,10 +74,15 @@ async function startServer() {
       return res.status(400).json({ error: "Nenhuma imagem fornecida para leitura." });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.GOOGLE_API_KEY;
+    const apiKey =
+      process.env.GEMINI_API_KEY ||
+      process.env.API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      "AIzaSyDcyHCa--6BgvzyUz01LlTehqjzaHdDhZw";
+
     if (!apiKey) {
       return res.status(500).json({
-        error: "Chave GEMINI_API_KEY não configurada. Por favor, adicione sua chave nas configurações (Settings/Secrets) do Google AI Studio para ativar o escaneamento inteligente de notas e pedidos.",
+        error: "Chave GEMINI_API_KEY não configurada. Por favor, configure a chave nas configurações do projeto.",
       });
     }
 
