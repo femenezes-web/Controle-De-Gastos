@@ -4,11 +4,56 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { GoogleGenAI, Type } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Helper para obter a chave Gemini dinamicamente via variáveis de ambiente
+function resolveApiKey(): string | null {
+  // 1. Prioriza o segredo Controledegastos criado no painel do AI Studio
+  const candidates: (string | undefined)[] = [
+    process.env.Controledegastos,
+    (process.env as any).controledegastos,
+  ];
+
+  for (const c of candidates) {
+    if (c && typeof c === "string" && c.trim().length > 10) {
+      return c.trim();
+    }
+  }
+
+  // 2. Leitura de /app/.dev.env.json caso exista no container
+  try {
+    const devJson = "/app/.dev.env.json";
+    if (fs.existsSync(devJson)) {
+      const data = JSON.parse(fs.readFileSync(devJson, "utf-8"));
+      if (data.Controledegastos && typeof data.Controledegastos === "string") {
+        const val = data.Controledegastos.trim();
+        if (val.length > 10) {
+          return val;
+        }
+      }
+    }
+  } catch {}
+
+  // 3. Fallback para outras variáveis de ambiente
+  const fallbacks = [
+    process.env.GEMINI_API_KEY,
+    process.env.API_KEY,
+    process.env.GOOGLE_API_KEY,
+  ];
+
+  for (const c of fallbacks) {
+    if (c && typeof c === "string" && c.trim().length > 10 && !c.includes("6BgvzyUz")) {
+      return c.trim();
+    }
+  }
+
+  return null;
+}
 
 const db = new Database("finance.db");
 
@@ -75,7 +120,7 @@ async function startServer() {
       return res.status(400).json({ error: "Nenhuma imagem fornecida para leitura." });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.GOOGLE_API_KEY;
+    const apiKey = resolveApiKey();
 
     if (!apiKey) {
       return res.status(500).json({
