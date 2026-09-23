@@ -74,15 +74,11 @@ async function startServer() {
       return res.status(400).json({ error: "Nenhuma imagem fornecida para leitura." });
     }
 
-    const apiKey =
-      process.env.GEMINI_API_KEY ||
-      process.env.API_KEY ||
-      process.env.GOOGLE_API_KEY ||
-      "AIzaSyDcyHCa--6BgvzyUz01LlTehqjzaHdDhZw";
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || process.env.GOOGLE_API_KEY;
 
     if (!apiKey) {
       return res.status(500).json({
-        error: "Chave GEMINI_API_KEY não configurada. Por favor, configure a chave nas configurações do projeto.",
+        error: "Chave GEMINI_API_KEY não configurada no servidor. Por favor, adicione sua chave de API nas configurações do ambiente.",
       });
     }
 
@@ -220,9 +216,23 @@ Analise atentamente a foto deste pedido ou comprovante e extraia as seguintes in
       res.json(extractedData);
     } catch (error: any) {
       console.error("Erro na leitura do comprovante via Gemini:", error);
-      res.status(500).json({
-        error: error?.message || "Não foi possível analisar a imagem da nota fiscal.",
-      });
+      const rawError = error?.message || String(error || "");
+      let friendlyMessage = "Não foi possível analisar a imagem do pedido.";
+
+      if (rawError.includes("leaked") || rawError.includes("PERMISSION_DENIED") || rawError.includes("403")) {
+        friendlyMessage =
+          "Sua chave de API do Gemini foi revogada por segurança (leaked key). Por favor, acesse o menu de Configurações (Settings > Secrets) no Google AI Studio e selecione uma nova chave de API válida para reativar o escaneamento inteligente.";
+      } else if (rawError.includes("API_KEY_INVALID") || rawError.includes("API key not valid")) {
+        friendlyMessage =
+          "A chave de API informada é inválida. Por favor, verifique sua chave em Settings > Secrets no Google AI Studio.";
+      } else if (rawError.includes("RESOURCE_EXHAUSTED") || rawError.includes("429")) {
+        friendlyMessage =
+          "Limite de requisições temporariamente atingido. Aguarde alguns segundos e tente novamente.";
+      } else if (error?.message) {
+        friendlyMessage = error.message;
+      }
+
+      res.status(500).json({ error: friendlyMessage });
     }
   });
 
